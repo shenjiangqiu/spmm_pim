@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use log::{debug, info};
+use log::{debug, info, warn};
 use sprs::{CsMatBase, IndPtr, IndPtrBase, SpIndex};
 use std::ops::Deref;
 #[derive(Debug, PartialEq)]
@@ -44,6 +44,9 @@ where
     }
     pub fn ptr(&self) -> &IndPtrBase<Iptr, IptrStorage> {
         &self.ptr
+    }
+    pub fn nnz(&self)->usize{
+        self.ptr.nnz()
     }
 }
 struct BsrRowbuilder<N, I, const C: usize, const R: usize> {
@@ -120,7 +123,7 @@ where
         }
         let (rows, cols) = matrix.shape();
         if rows % R != 0 || cols % C != 0 {
-            panic!("Matrix shape is not compatible with block size");
+            warn!("Matrix shape is not compatible with block size");
         }
         let mut iptr: Vec<Iptr> = vec![];
         let mut index: Vec<I> = vec![];
@@ -184,15 +187,13 @@ where
 
 #[cfg(test)]
 mod test {
+    use env_logger::Env;
     use sprs::{CsMat, TriMat};
 
     use super::*;
     #[test]
     fn test_bsr() {
-        if std::env::var("RUST_LOG").is_err() {
-            std::env::set_var("RUST_LOG", "debug");
-        }
-        pretty_env_logger::try_init().unwrap_or_default();
+        env_logger::Builder::from_env(Env::default().default_filter_or("debug")).try_init().unwrap_or_default();
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<2, 2, _> = Bsr::from(csr);
