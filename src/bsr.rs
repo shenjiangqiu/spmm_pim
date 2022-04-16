@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use log::{debug, info, warn};
+use log::{debug, warn};
 use sprs::{CsMatBase, IndPtr, IndPtrBase, SpIndex};
 use std::ops::Deref;
 #[derive(Debug, PartialEq)]
