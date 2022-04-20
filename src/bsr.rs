@@ -187,13 +187,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use env_logger::Env;
     use sprs::{CsMat, TriMat};
-
+    use crate::utils::test::init_log;
     use super::*;
     #[test]
     fn test_bsr() {
-        env_logger::Builder::from_env(Env::default().default_filter_or("debug")).try_init().unwrap_or_default();
+        init_log();
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<2, 2, _> = Bsr::from(csr);
