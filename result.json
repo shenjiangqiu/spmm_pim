@@ -1,3 +1,52 @@
 {
-  "all": []
+  "all": [
+    {
+      "file": "test.mtx",
+      "c": 64,
+      "origin_nnz": 8,
+      "new_nnz": 5,
+      "new_element": 320,
+      "need_speed_up": 40.0
+    },
+    {
+      "file": "test.mtx",
+      "c": 128,
+      "origin_nnz": 8,
+      "new_nnz": 5,
+      "new_element": 640,
+      "need_speed_up": 80.0
+    },
+    {
+      "file": "test.mtx",
+      "c": 256,
+      "origin_nnz": 8,
+      "new_nnz": 5,
+      "new_element": 1280,
+      "need_speed_up": 160.0
+    },
+    {
+      "file": "test.mtx",
+      "c": 512,
+      "origin_nnz": 8,
+      "new_nnz": 5,
+      "new_element": 2560,
+      "need_speed_up": 320.0
+    },
+    {
+      "file": "test.mtx",
+      "c": 1024,
+      "origin_nnz": 8,
+      "new_nnz": 5,
+      "new_element": 5120,
+      "need_speed_up": 640.0
+    },
+    {
+      "file": "test.mtx",
+      "c": 2048,
+      "origin_nnz": 8,
+      "new_nnz": 5,
+      "new_element": 10240,
+      "need_speed_up": 1280.0
+    }
+  ]
 }

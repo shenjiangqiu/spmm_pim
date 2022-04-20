@@ -2,6 +2,10 @@
 
 pub mod bsr;
 pub mod utils;
+pub mod settings;
+pub mod args;
+pub mod result;
+pub mod run;
 
 #[cfg(test)]
 mod test {

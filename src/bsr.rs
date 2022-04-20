@@ -45,7 +45,7 @@ where
     pub fn ptr(&self) -> &IndPtrBase<Iptr, IptrStorage> {
         &self.ptr
     }
-    pub fn nnz(&self)->usize{
+    pub fn nnz(&self) -> usize {
         self.ptr.nnz()
     }
 }
@@ -187,9 +187,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use sprs::{CsMat, TriMat};
-    use crate::utils::test::init_log;
     use super::*;
+    use crate::utils::test::init_log;
+    use sprs::{CsMat, TriMat};
     #[test]
     fn test_bsr() {
         init_log();
@@ -203,11 +203,31 @@ mod test {
                 [[0, 0], [0, 2]],
                 [[1, 0], [0, -2]],
                 [[0, 0], [3, 0]],
-                [[1, 0], [0, 0]],
+                [[1, 0], [0, -1]],
             ],
             index: vec![0, 1, 0, 1, 2, 2],
             ptr: IndPtrBase::new_checked(vec![0, 2, 5, 6]).unwrap(),
         };
         assert_eq!(bsr, true_bsr);
+    }
+
+    #[test]
+    fn test_big() {
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
+        let csr: CsMat<_> = matrix.to_csr();
+        let bsr: Bsr<1, 16, _> = Bsr::from(csr);
+        let true_value = Bsr {
+            data: vec![
+                [[1, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                [[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                [[0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                [[0, 2, 0, -2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                [[0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                [[0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+            ],
+            index: vec![0, 0, 0, 0, 0, 0],
+            ptr: IndPtrBase::new_checked(vec![0, 1, 2, 3, 4, 5, 6]).unwrap(),
+        };
+        assert_eq!(bsr, true_value);
     }
 }

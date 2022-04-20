@@ -1,0 +1,11 @@
+
+mtx_files = [
+    "mtx/lp_e226.mtx",
+    "mtx/lp_e226_transposed.mtx",
+    "mtx/lp_share1b.mtx",
+    "mtx/Franz6_id1959_aug.mtx",
+    "mtx/Groebner_id2003_aug.mtx",
+    "mtx/plskz362.mtx",
+    "mtx/Pd.mtx",
+    "mtx/pts5ldd03.mtx",
+]
