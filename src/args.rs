@@ -5,7 +5,7 @@ use clap_complete::Shell;
 
 
 #[derive(Parser, Debug)]
-#[clap(author,version,about,long_about=None)]
+#[clap(author="Jiangqiu Shen",version,about="a spmm pim simulator",long_about=None)]
 pub struct Args {
     /// the path of config file, default is "default.toml"
     #[clap(short,long,parse(from_os_str),value_name="FILE")]
