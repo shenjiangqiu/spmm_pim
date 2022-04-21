@@ -9,3 +9,4 @@ mtx_files = [
     "mtx/Pd.mtx",
     "mtx/pts5ldd03.mtx",
 ]
+result_file = "result.json"

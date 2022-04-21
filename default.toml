@@ -1,1 +1,2 @@
 mtx_files = ["test.mtx"]
+result_file = "result.json"

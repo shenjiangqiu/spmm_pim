@@ -1,7 +1,9 @@
 use itertools::Itertools;
-use log::{debug, warn};
+use log::debug;
 use sprs::{CsMatBase, IndPtr, IndPtrBase, SpIndex};
 use std::ops::Deref;
+
+use crate::bsr_row_builder::BsrRowbuilder;
 #[derive(Debug, PartialEq)]
 pub struct Bsr<
     const R: usize,
@@ -49,62 +51,6 @@ where
         self.ptr.nnz()
     }
 }
-struct BsrRowbuilder<N, I, const C: usize, const R: usize> {
-    data: Vec<[[N; C]; R]>,
-    index: Vec<I>,
-    current_working_window: [[N; C]; R],
-    current_c: usize,
-    current_nnz: usize,
-}
-
-impl<N, I, const C: usize, const R: usize> BsrRowbuilder<N, I, C, R>
-where
-    N: Default + Copy + Clone,
-    I: SpIndex,
-{
-    fn new() -> Self {
-        let a = N::default();
-        BsrRowbuilder {
-            data: vec![],
-            index: vec![],
-            current_working_window: [[a; C]; R],
-            current_c: 0,
-            current_nnz: 0,
-        }
-    }
-    ///  gradually push index and data into the builder, the index ***must*** from small to large
-    fn push_element(&mut self, index: I, value: N, row: usize) {
-        if row >= R {
-            panic!("row index out of bounds");
-        }
-        // test if
-        if index.index() >= self.current_c + C {
-            // push to result and make a new one
-            if self.current_nnz != 0 {
-                debug!("push to result and make a new one");
-
-                self.data.push(self.current_working_window);
-                self.index.push(I::from(self.current_c / C).unwrap());
-
-                self.current_working_window = [[N::default(); C]; R];
-                self.current_nnz = 0;
-            }
-            self.current_c = index.index() / C * C;
-        }
-
-        self.current_working_window[row][index.index() - self.current_c] = value;
-        self.current_nnz += 1;
-    }
-    fn into_row(self) -> (Vec<I>, Vec<[[N; C]; R]>) {
-        let mut me = self;
-        if me.current_nnz != 0 {
-            me.data.push(me.current_working_window);
-            me.index.push(I::from(me.current_c / C).unwrap());
-        }
-
-        (me.index, me.data)
-    }
-}
 
 impl<const R: usize, const C: usize, N, I, IptrStorage, IndStorage, DataStorage, Iptr>
     From<CsMatBase<N, I, IptrStorage, IndStorage, DataStorage, Iptr>>
@@ -123,7 +69,7 @@ where
         }
         let (rows, cols) = matrix.shape();
         if rows % R != 0 || cols % C != 0 {
-            warn!("Matrix shape is not compatible with block size");
+            debug!("Matrix shape is not compatible with block size, padding with zeros, matrix shape: {:?}, block size: {:?}", (rows, cols), (R, C));
         }
         let mut iptr: Vec<Iptr> = vec![];
         let mut index: Vec<I> = vec![];
@@ -136,19 +82,19 @@ where
             debug!("start to processing ptr: {}'s chunck", current_ptr);
 
             let chunk_vec = chunck.collect_vec();
-            let mut chuck_iter = chunk_vec.iter().map(|x| x.iter().peekable()).collect_vec();
-            assert!(chunk_vec.len() == R);
+            let mut chunk_iter = chunk_vec.iter().map(|x| x.iter().peekable()).collect_vec();
 
             let mut row_builder = BsrRowbuilder::new();
 
-            'out: loop {
+            loop {
                 // choose the min index
                 let mut min_index = usize::MAX;
                 let mut min_index_row = 0;
                 let mut min_value = N::default();
                 let mut all_empty = true;
+
                 // find the min index
-                for (row, row_vec) in chuck_iter.iter_mut().enumerate() {
+                for (row, row_vec) in chunk_iter.iter_mut().enumerate() {
                     if row_vec.peek().is_none() {
                         continue;
                     }
@@ -170,12 +116,12 @@ where
                     data.append(&mut tdata);
                     index.append(&mut tindex);
                     iptr.push(Iptr::from_usize(current_ptr));
-                    break 'out;
+                    break;
                 }
                 // push the min index
                 row_builder.push_element(I::from_usize(min_index), min_value, min_index_row);
                 // pop the min
-                chuck_iter[min_index_row].next();
+                chunk_iter[min_index_row].next();
             }
         }
 
@@ -188,11 +134,12 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::test::init_log;
+    use crate::utils::init_log;
+    use eyre::Result;
     use sprs::{CsMat, TriMat};
     #[test]
     fn test_bsr() {
-        init_log();
+        init_log("debug");
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<2, 2, _> = Bsr::from(csr);
@@ -212,10 +159,33 @@ mod test {
     }
 
     #[test]
-    fn test_big() {
+    fn test_unalign() {
+        init_log("debug");
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
+        let bsr: Bsr<4, 4, _> = Bsr::from(csr);
+        // let true_bsr = Bsr {
+        //     data: vec![
+        //         [[1, 0], [0, 1]],
+        //         [[0, 6], [0, 0]],
+        //         [[0, 0], [0, 2]],
+        //         [[1, 0], [0, -2]],
+        //         [[0, 0], [3, 0]],
+        //         [[1, 0], [0, -1]],
+        //     ],
+        //     index: vec![0, 1, 0, 1, 2, 2],
+        //     ptr: IndPtrBase::new_checked(vec![0, 2, 5, 6]).unwrap(),
+        // };
+        // assert_eq!(bsr, true_bsr);
+        debug!("{:?}", bsr);
+    }
+
+    #[test]
+    fn test_big() -> Result<()> {
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx")?;
+        let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<1, 16, _> = Bsr::from(csr);
+        let ptr = IndPtrBase::new_checked(vec![0, 1, 2, 3, 4, 5, 6]).map_err(|e| e.1)?;
         let true_value = Bsr {
             data: vec![
                 [[1, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
@@ -226,8 +196,9 @@ mod test {
                 [[0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
             ],
             index: vec![0, 0, 0, 0, 0, 0],
-            ptr: IndPtrBase::new_checked(vec![0, 1, 2, 3, 4, 5, 6]).unwrap(),
+            ptr,
         };
         assert_eq!(bsr, true_value);
+        Ok(())
     }
 }

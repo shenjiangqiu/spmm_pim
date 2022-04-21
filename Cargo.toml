@@ -14,4 +14,6 @@ serde_json="1.0.79"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.1.10", features = ["derive"] }
 config = "0.13.1"
-unroll = "0.1.5"
+eyre = "0.6.8"
+toml = "0.5.9"
+clap_complete = "3.1.2"

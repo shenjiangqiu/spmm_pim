@@ -1,39 +1,42 @@
-
-
-pub mod bsr;
-pub mod utils;
-pub mod settings;
 pub mod args;
+pub mod bsr;
 pub mod result;
 pub mod run;
-
+pub mod settings;
+pub mod utils;
+pub mod bsr_row_builder;
 #[cfg(test)]
 mod test {
-    use sprs::{TriMat, CsMat};
+    use eyre::Result;
+    use log::debug;
+    use sprs::{CsMat, TriMat};
 
-    use crate::utils::test::init_log;
+    use crate::utils::init_log;
 
     #[test]
-    fn test_csc() {
-        init_log();
-        let matrix: TriMat<i32> = sprs::io::read_matrix_market("./test.mtx").unwrap();
+    fn test_csc() -> Result<()> {
+        init_log("debug");
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("./test.mtx")?;
         let csc: CsMat<_> = matrix.to_csc();
-        println!("{:?}", csc);
+        debug!("{:?}", csc);
+        Ok(())
     }
 
     #[test]
-    fn test_csr(){
-        init_log();
-        let matrix: TriMat<i32> = sprs::io::read_matrix_market("./test.mtx").unwrap();
+    fn test_csr() -> Result<()> {
+        init_log("debug");
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("./test.mtx")?;
         let csr: CsMat<_> = matrix.to_csr();
-        println!("{:?}", csr);
+        debug!("{:?}", csr);
+        Ok(())
     }
 
     #[test]
-    fn test_bsr(){
-        init_log();
-        let matrix: TriMat<i32> = sprs::io::read_matrix_market("./test.mtx").unwrap();
+    fn test_bsr() -> Result<()> {
+        init_log("debug");
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("./test.mtx")?;
         let bsr: super::bsr::Bsr<2, 2, _> = super::bsr::Bsr::from(matrix.to_csr());
-        println!("{:?}", bsr);
+        debug!("{:?}", bsr);
+        Ok(())
     }
 }

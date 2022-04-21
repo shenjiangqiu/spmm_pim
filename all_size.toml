@@ -1,0 +1,3023 @@
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 64
+r = 1
+origin_nnz = 450
+new_nnz = 62
+new_element = 3968
+need_speed_up = 8.817778
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 128
+r = 1
+origin_nnz = 450
+new_nnz = 62
+new_element = 7936
+need_speed_up = 17.635555
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 256
+r = 1
+origin_nnz = 450
+new_nnz = 62
+new_element = 15872
+need_speed_up = 35.27111
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 512
+r = 1
+origin_nnz = 450
+new_nnz = 62
+new_element = 31744
+need_speed_up = 70.54222
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 1024
+r = 1
+origin_nnz = 450
+new_nnz = 62
+new_element = 63488
+need_speed_up = 141.08444
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 2048
+r = 1
+origin_nnz = 450
+new_nnz = 62
+new_element = 126976
+need_speed_up = 282.16888
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 8
+r = 8
+origin_nnz = 450
+new_nnz = 46
+new_element = 2944
+need_speed_up = 6.542222
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 32
+r = 4
+origin_nnz = 450
+new_nnz = 30
+new_element = 3840
+need_speed_up = 8.533334
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 16
+r = 16
+origin_nnz = 450
+new_nnz = 14
+new_element = 3584
+need_speed_up = 7.9644446
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 32
+r = 32
+origin_nnz = 450
+new_nnz = 4
+new_element = 4096
+need_speed_up = 9.102222
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 16
+r = 32
+origin_nnz = 450
+new_nnz = 8
+new_element = 4096
+need_speed_up = 9.102222
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 32
+r = 64
+origin_nnz = 450
+new_nnz = 2
+new_element = 4096
+need_speed_up = 9.102222
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 16
+r = 64
+origin_nnz = 450
+new_nnz = 4
+new_element = 4096
+need_speed_up = 9.102222
+
+[[all]]
+file = 'mtx/bfwa62.mtx'
+c = 64
+r = 4
+origin_nnz = 450
+new_nnz = 16
+new_element = 4096
+need_speed_up = 9.102222
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 64
+r = 1
+origin_nnz = 2768
+new_nnz = 619
+new_element = 39616
+need_speed_up = 14.312139
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 128
+r = 1
+origin_nnz = 2768
+new_nnz = 501
+new_element = 64128
+need_speed_up = 23.16763
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 256
+r = 1
+origin_nnz = 2768
+new_nnz = 388
+new_element = 99328
+need_speed_up = 35.88439
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 512
+r = 1
+origin_nnz = 2768
+new_nnz = 223
+new_element = 114176
+need_speed_up = 41.248554
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 1024
+r = 1
+origin_nnz = 2768
+new_nnz = 223
+new_element = 228352
+need_speed_up = 82.49711
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 2048
+r = 1
+origin_nnz = 2768
+new_nnz = 223
+new_element = 456704
+need_speed_up = 164.99422
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 8
+r = 8
+origin_nnz = 2768
+new_nnz = 416
+new_element = 26624
+need_speed_up = 9.618497
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 32
+r = 4
+origin_nnz = 2768
+new_nnz = 314
+new_element = 40192
+need_speed_up = 14.520231
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 16
+r = 16
+origin_nnz = 2768
+new_nnz = 185
+new_element = 47360
+need_speed_up = 17.109827
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 32
+r = 32
+origin_nnz = 2768
+new_nnz = 70
+new_element = 71680
+need_speed_up = 25.895954
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 16
+r = 32
+origin_nnz = 2768
+new_nnz = 121
+new_element = 61952
+need_speed_up = 22.381502
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 32
+r = 64
+origin_nnz = 2768
+new_nnz = 45
+new_element = 92160
+need_speed_up = 33.294796
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 16
+r = 64
+origin_nnz = 2768
+new_nnz = 83
+new_element = 84992
+need_speed_up = 30.705202
+
+[[all]]
+file = 'mtx/lp_e226.mtx'
+c = 64
+r = 4
+origin_nnz = 2768
+new_nnz = 231
+new_element = 59136
+need_speed_up = 21.364162
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 64
+r = 1
+origin_nnz = 3
+new_nnz = 2
+new_element = 128
+need_speed_up = 42.666668
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 128
+r = 1
+origin_nnz = 3
+new_nnz = 2
+new_element = 256
+need_speed_up = 85.333336
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 256
+r = 1
+origin_nnz = 3
+new_nnz = 2
+new_element = 512
+need_speed_up = 170.66667
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 512
+r = 1
+origin_nnz = 3
+new_nnz = 2
+new_element = 1024
+need_speed_up = 341.33334
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 1024
+r = 1
+origin_nnz = 3
+new_nnz = 2
+new_element = 2048
+need_speed_up = 682.6667
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 2048
+r = 1
+origin_nnz = 3
+new_nnz = 2
+new_element = 4096
+need_speed_up = 1365.3334
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 8
+r = 8
+origin_nnz = 3
+new_nnz = 1
+new_element = 64
+need_speed_up = 21.333334
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 32
+r = 4
+origin_nnz = 3
+new_nnz = 1
+new_element = 128
+need_speed_up = 42.666668
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 16
+r = 16
+origin_nnz = 3
+new_nnz = 1
+new_element = 256
+need_speed_up = 85.333336
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 32
+r = 32
+origin_nnz = 3
+new_nnz = 1
+new_element = 1024
+need_speed_up = 341.33334
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 16
+r = 32
+origin_nnz = 3
+new_nnz = 1
+new_element = 512
+need_speed_up = 170.66667
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 32
+r = 64
+origin_nnz = 3
+new_nnz = 1
+new_element = 2048
+need_speed_up = 682.6667
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 16
+r = 64
+origin_nnz = 3
+new_nnz = 1
+new_element = 1024
+need_speed_up = 341.33334
+
+[[all]]
+file = 'mtx/Trec4.mtx'
+c = 64
+r = 4
+origin_nnz = 3
+new_nnz = 1
+new_element = 256
+need_speed_up = 85.333336
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 64
+r = 1
+origin_nnz = 2768
+new_nnz = 775
+new_element = 49600
+need_speed_up = 17.919075
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 128
+r = 1
+origin_nnz = 2768
+new_nnz = 620
+new_element = 79360
+need_speed_up = 28.67052
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 256
+r = 1
+origin_nnz = 2768
+new_nnz = 472
+new_element = 120832
+need_speed_up = 43.65318
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 512
+r = 1
+origin_nnz = 2768
+new_nnz = 472
+new_element = 241664
+need_speed_up = 87.30636
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 1024
+r = 1
+origin_nnz = 2768
+new_nnz = 472
+new_element = 483328
+need_speed_up = 174.61272
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 2048
+r = 1
+origin_nnz = 2768
+new_nnz = 472
+new_element = 966656
+need_speed_up = 349.22543
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 8
+r = 8
+origin_nnz = 2768
+new_nnz = 416
+new_element = 26624
+need_speed_up = 9.618497
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 32
+r = 4
+origin_nnz = 2768
+new_nnz = 347
+new_element = 44416
+need_speed_up = 16.046244
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 16
+r = 16
+origin_nnz = 2768
+new_nnz = 185
+new_element = 47360
+need_speed_up = 17.109827
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 32
+r = 32
+origin_nnz = 2768
+new_nnz = 70
+new_element = 71680
+need_speed_up = 25.895954
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 16
+r = 32
+origin_nnz = 2768
+new_nnz = 120
+new_element = 61440
+need_speed_up = 22.196531
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 32
+r = 64
+origin_nnz = 2768
+new_nnz = 42
+new_element = 86016
+need_speed_up = 31.075144
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 16
+r = 64
+origin_nnz = 2768
+new_nnz = 78
+new_element = 79872
+need_speed_up = 28.855492
+
+[[all]]
+file = 'mtx/lp_e226_transposed.mtx'
+c = 64
+r = 4
+origin_nnz = 2768
+new_nnz = 253
+new_element = 64768
+need_speed_up = 23.398844
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 64
+r = 1
+origin_nnz = 4
+new_nnz = 2
+new_element = 128
+need_speed_up = 32.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 128
+r = 1
+origin_nnz = 4
+new_nnz = 2
+new_element = 256
+need_speed_up = 64.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 256
+r = 1
+origin_nnz = 4
+new_nnz = 2
+new_element = 512
+need_speed_up = 128.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 512
+r = 1
+origin_nnz = 4
+new_nnz = 2
+new_element = 1024
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 1024
+r = 1
+origin_nnz = 4
+new_nnz = 2
+new_element = 2048
+need_speed_up = 512.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 2048
+r = 1
+origin_nnz = 4
+new_nnz = 2
+new_element = 4096
+need_speed_up = 1024.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 8
+r = 8
+origin_nnz = 4
+new_nnz = 1
+new_element = 64
+need_speed_up = 16.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 32
+r = 4
+origin_nnz = 4
+new_nnz = 1
+new_element = 128
+need_speed_up = 32.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 16
+r = 16
+origin_nnz = 4
+new_nnz = 1
+new_element = 256
+need_speed_up = 64.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 32
+r = 32
+origin_nnz = 4
+new_nnz = 1
+new_element = 1024
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 16
+r = 32
+origin_nnz = 4
+new_nnz = 1
+new_element = 512
+need_speed_up = 128.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 32
+r = 64
+origin_nnz = 4
+new_nnz = 1
+new_element = 2048
+need_speed_up = 512.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 16
+r = 64
+origin_nnz = 4
+new_nnz = 1
+new_element = 1024
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/one.mtx'
+c = 64
+r = 4
+origin_nnz = 4
+new_nnz = 1
+new_element = 256
+need_speed_up = 64.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 64
+r = 1
+origin_nnz = 1
+new_nnz = 1
+new_element = 64
+need_speed_up = 64.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 128
+r = 1
+origin_nnz = 1
+new_nnz = 1
+new_element = 128
+need_speed_up = 128.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 256
+r = 1
+origin_nnz = 1
+new_nnz = 1
+new_element = 256
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 512
+r = 1
+origin_nnz = 1
+new_nnz = 1
+new_element = 512
+need_speed_up = 512.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 1024
+r = 1
+origin_nnz = 1
+new_nnz = 1
+new_element = 1024
+need_speed_up = 1024.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 2048
+r = 1
+origin_nnz = 1
+new_nnz = 1
+new_element = 2048
+need_speed_up = 2048.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 8
+r = 8
+origin_nnz = 1
+new_nnz = 1
+new_element = 64
+need_speed_up = 64.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 32
+r = 4
+origin_nnz = 1
+new_nnz = 1
+new_element = 128
+need_speed_up = 128.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 16
+r = 16
+origin_nnz = 1
+new_nnz = 1
+new_element = 256
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 32
+r = 32
+origin_nnz = 1
+new_nnz = 1
+new_element = 1024
+need_speed_up = 1024.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 16
+r = 32
+origin_nnz = 1
+new_nnz = 1
+new_element = 512
+need_speed_up = 512.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 32
+r = 64
+origin_nnz = 1
+new_nnz = 1
+new_element = 2048
+need_speed_up = 2048.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 16
+r = 64
+origin_nnz = 1
+new_nnz = 1
+new_element = 1024
+need_speed_up = 1024.0
+
+[[all]]
+file = 'mtx/two.mtx'
+c = 64
+r = 4
+origin_nnz = 1
+new_nnz = 1
+new_element = 256
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 64
+r = 1
+origin_nnz = 173670
+new_nnz = 27884
+new_element = 1784576
+need_speed_up = 10.275672
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 128
+r = 1
+origin_nnz = 173670
+new_nnz = 19708
+new_element = 2522624
+need_speed_up = 14.525387
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 256
+r = 1
+origin_nnz = 173670
+new_nnz = 13424
+new_element = 3436544
+need_speed_up = 19.78778
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 512
+r = 1
+origin_nnz = 173670
+new_nnz = 9511
+new_element = 4869632
+need_speed_up = 28.03957
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 1024
+r = 1
+origin_nnz = 173670
+new_nnz = 6943
+new_element = 7109632
+need_speed_up = 40.937595
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 2048
+r = 1
+origin_nnz = 173670
+new_nnz = 5498
+new_element = 11259904
+need_speed_up = 64.83505
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 8
+r = 8
+origin_nnz = 173670
+new_nnz = 21086
+new_element = 1349504
+need_speed_up = 7.7705073
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 32
+r = 4
+origin_nnz = 173670
+new_nnz = 14149
+new_element = 1811072
+need_speed_up = 10.428238
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 16
+r = 16
+origin_nnz = 173670
+new_nnz = 7790
+new_element = 1994240
+need_speed_up = 11.482927
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 32
+r = 32
+origin_nnz = 173670
+new_nnz = 2738
+new_element = 2803712
+need_speed_up = 16.143906
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 16
+r = 32
+origin_nnz = 173670
+new_nnz = 4764
+new_element = 2439168
+need_speed_up = 14.044844
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 32
+r = 64
+origin_nnz = 173670
+new_nnz = 1599
+new_element = 3274752
+need_speed_up = 18.856176
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 16
+r = 64
+origin_nnz = 173670
+new_nnz = 2904
+new_element = 2973696
+need_speed_up = 17.12268
+
+[[all]]
+file = 'mtx/Groebner_id2003_aug.mtx'
+c = 64
+r = 4
+origin_nnz = 173670
+new_nnz = 9217
+new_element = 2359552
+need_speed_up = 13.586411
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 64
+r = 1
+origin_nnz = 15
+new_nnz = 7
+new_element = 448
+need_speed_up = 29.866667
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 128
+r = 1
+origin_nnz = 15
+new_nnz = 7
+new_element = 896
+need_speed_up = 59.733334
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 256
+r = 1
+origin_nnz = 15
+new_nnz = 7
+new_element = 1792
+need_speed_up = 119.46667
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 512
+r = 1
+origin_nnz = 15
+new_nnz = 7
+new_element = 3584
+need_speed_up = 238.93333
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 1024
+r = 1
+origin_nnz = 15
+new_nnz = 7
+new_element = 7168
+need_speed_up = 477.86667
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 2048
+r = 1
+origin_nnz = 15
+new_nnz = 7
+new_element = 14336
+need_speed_up = 955.73334
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 8
+r = 8
+origin_nnz = 15
+new_nnz = 1
+new_element = 64
+need_speed_up = 4.266667
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 32
+r = 4
+origin_nnz = 15
+new_nnz = 2
+new_element = 256
+need_speed_up = 17.066668
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 16
+r = 16
+origin_nnz = 15
+new_nnz = 1
+new_element = 256
+need_speed_up = 17.066668
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 32
+r = 32
+origin_nnz = 15
+new_nnz = 1
+new_element = 1024
+need_speed_up = 68.26667
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 16
+r = 32
+origin_nnz = 15
+new_nnz = 1
+new_element = 512
+need_speed_up = 34.133335
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 32
+r = 64
+origin_nnz = 15
+new_nnz = 1
+new_element = 2048
+need_speed_up = 136.53334
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 16
+r = 64
+origin_nnz = 15
+new_nnz = 1
+new_element = 1024
+need_speed_up = 68.26667
+
+[[all]]
+file = 'mtx/b1_ss.mtx'
+c = 64
+r = 4
+origin_nnz = 15
+new_nnz = 2
+new_element = 512
+need_speed_up = 34.133335
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 64
+r = 1
+origin_nnz = 1179
+new_nnz = 271
+new_element = 17344
+need_speed_up = 14.710772
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 128
+r = 1
+origin_nnz = 1179
+new_nnz = 215
+new_element = 27520
+need_speed_up = 23.341816
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 256
+r = 1
+origin_nnz = 1179
+new_nnz = 117
+new_element = 29952
+need_speed_up = 25.404581
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 512
+r = 1
+origin_nnz = 1179
+new_nnz = 117
+new_element = 59904
+need_speed_up = 50.809162
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 1024
+r = 1
+origin_nnz = 1179
+new_nnz = 117
+new_element = 119808
+need_speed_up = 101.618324
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 2048
+r = 1
+origin_nnz = 1179
+new_nnz = 117
+new_element = 239616
+need_speed_up = 203.23665
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 8
+r = 8
+origin_nnz = 1179
+new_nnz = 159
+new_element = 10176
+need_speed_up = 8.631043
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 32
+r = 4
+origin_nnz = 1179
+new_nnz = 136
+new_element = 17408
+need_speed_up = 14.765055
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 16
+r = 16
+origin_nnz = 1179
+new_nnz = 77
+new_element = 19712
+need_speed_up = 16.719254
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 32
+r = 32
+origin_nnz = 1179
+new_nnz = 29
+new_element = 29696
+need_speed_up = 25.187447
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 16
+r = 32
+origin_nnz = 1179
+new_nnz = 50
+new_element = 25600
+need_speed_up = 21.713316
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 32
+r = 64
+origin_nnz = 1179
+new_nnz = 16
+new_element = 32768
+need_speed_up = 27.793045
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 16
+r = 64
+origin_nnz = 1179
+new_nnz = 30
+new_element = 30720
+need_speed_up = 26.055979
+
+[[all]]
+file = 'mtx/lp_share1b.mtx'
+c = 64
+r = 4
+origin_nnz = 1179
+new_nnz = 94
+new_element = 24064
+need_speed_up = 20.410517
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 64
+r = 1
+origin_nnz = 48472
+new_nnz = 40120
+new_element = 2567680
+need_speed_up = 52.97244
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 128
+r = 1
+origin_nnz = 48472
+new_nnz = 37274
+new_element = 4771072
+need_speed_up = 98.42944
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 256
+r = 1
+origin_nnz = 48472
+new_nnz = 32422
+new_element = 8300032
+need_speed_up = 171.23354
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 512
+r = 1
+origin_nnz = 48472
+new_nnz = 26896
+new_element = 13770752
+need_speed_up = 284.09705
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 1024
+r = 1
+origin_nnz = 48472
+new_nnz = 20064
+new_element = 20545536
+need_speed_up = 423.864
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 2048
+r = 1
+origin_nnz = 48472
+new_nnz = 15808
+new_element = 32374784
+need_speed_up = 667.9069
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 8
+r = 8
+origin_nnz = 48472
+new_nnz = 5954
+new_element = 381056
+need_speed_up = 7.8613634
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 32
+r = 4
+origin_nnz = 48472
+new_nnz = 10803
+new_element = 1382784
+need_speed_up = 28.52748
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 16
+r = 16
+origin_nnz = 48472
+new_nnz = 3400
+new_element = 870400
+need_speed_up = 17.956758
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 32
+r = 32
+origin_nnz = 48472
+new_nnz = 1656
+new_element = 1695744
+need_speed_up = 34.98399
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 16
+r = 32
+origin_nnz = 48472
+new_nnz = 2318
+new_element = 1186816
+need_speed_up = 24.484568
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 32
+r = 64
+origin_nnz = 48472
+new_nnz = 1154
+new_element = 2363392
+need_speed_up = 48.75788
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 16
+r = 64
+origin_nnz = 48472
+new_nnz = 1845
+new_element = 1889280
+need_speed_up = 38.97673
+
+[[all]]
+file = 'mtx/Franz6_id1959_aug.mtx'
+c = 64
+r = 4
+origin_nnz = 48472
+new_nnz = 10043
+new_element = 2571008
+need_speed_up = 53.041096
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 64
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 896
+need_speed_up = 19.47826
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 128
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 1792
+need_speed_up = 38.95652
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 256
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 3584
+need_speed_up = 77.91304
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 512
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 7168
+need_speed_up = 155.82608
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 1024
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 14336
+need_speed_up = 311.65216
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 2048
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 28672
+need_speed_up = 623.3043
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 8
+r = 8
+origin_nnz = 46
+new_nnz = 4
+new_element = 256
+need_speed_up = 5.5652175
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 32
+r = 4
+origin_nnz = 46
+new_nnz = 4
+new_element = 512
+need_speed_up = 11.130435
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 16
+r = 16
+origin_nnz = 46
+new_nnz = 1
+new_element = 256
+need_speed_up = 5.5652175
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 32
+r = 32
+origin_nnz = 46
+new_nnz = 1
+new_element = 1024
+need_speed_up = 22.26087
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 16
+r = 32
+origin_nnz = 46
+new_nnz = 1
+new_element = 512
+need_speed_up = 11.130435
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 32
+r = 64
+origin_nnz = 46
+new_nnz = 1
+new_element = 2048
+need_speed_up = 44.52174
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 16
+r = 64
+origin_nnz = 46
+new_nnz = 1
+new_element = 1024
+need_speed_up = 22.26087
+
+[[all]]
+file = 'mtx/LFAT5.mtx'
+c = 64
+r = 4
+origin_nnz = 46
+new_nnz = 4
+new_element = 1024
+need_speed_up = 22.26087
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 64
+r = 1
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 128
+r = 1
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 256
+r = 1
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 512
+r = 1
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 1024
+r = 1
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 2048
+r = 1
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 8
+r = 8
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 32
+r = 4
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 16
+r = 16
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 32
+r = 32
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 16
+r = 32
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 32
+r = 64
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 16
+r = 64
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/a04.mtx'
+c = 64
+r = 4
+origin_nnz = 0
+new_nnz = 0
+new_element = 0
+need_speed_up = -nan
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 64
+r = 1
+origin_nnz = 22
+new_nnz = 8
+new_element = 512
+need_speed_up = 23.272728
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 128
+r = 1
+origin_nnz = 22
+new_nnz = 8
+new_element = 1024
+need_speed_up = 46.545456
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 256
+r = 1
+origin_nnz = 22
+new_nnz = 8
+new_element = 2048
+need_speed_up = 93.09091
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 512
+r = 1
+origin_nnz = 22
+new_nnz = 8
+new_element = 4096
+need_speed_up = 186.18182
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 1024
+r = 1
+origin_nnz = 22
+new_nnz = 8
+new_element = 8192
+need_speed_up = 372.36365
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 2048
+r = 1
+origin_nnz = 22
+new_nnz = 8
+new_element = 16384
+need_speed_up = 744.7273
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 8
+r = 8
+origin_nnz = 22
+new_nnz = 2
+new_element = 128
+need_speed_up = 5.818182
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 32
+r = 4
+origin_nnz = 22
+new_nnz = 2
+new_element = 256
+need_speed_up = 11.636364
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 16
+r = 16
+origin_nnz = 22
+new_nnz = 1
+new_element = 256
+need_speed_up = 11.636364
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 32
+r = 32
+origin_nnz = 22
+new_nnz = 1
+new_element = 1024
+need_speed_up = 46.545456
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 16
+r = 32
+origin_nnz = 22
+new_nnz = 1
+new_element = 512
+need_speed_up = 23.272728
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 32
+r = 64
+origin_nnz = 22
+new_nnz = 1
+new_element = 2048
+need_speed_up = 93.09091
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 16
+r = 64
+origin_nnz = 22
+new_nnz = 1
+new_element = 1024
+need_speed_up = 46.545456
+
+[[all]]
+file = 'mtx/lpi_galenet.mtx'
+c = 64
+r = 4
+origin_nnz = 22
+new_nnz = 2
+new_element = 512
+need_speed_up = 23.272728
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 64
+r = 1
+origin_nnz = 1760
+new_nnz = 779
+new_element = 49856
+need_speed_up = 28.327272
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 128
+r = 1
+origin_nnz = 1760
+new_nnz = 723
+new_element = 92544
+need_speed_up = 52.581818
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 256
+r = 1
+origin_nnz = 1760
+new_nnz = 591
+new_element = 151296
+need_speed_up = 85.96364
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 512
+r = 1
+origin_nnz = 1760
+new_nnz = 362
+new_element = 185344
+need_speed_up = 105.30909
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 1024
+r = 1
+origin_nnz = 1760
+new_nnz = 362
+new_element = 370688
+need_speed_up = 210.61818
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 2048
+r = 1
+origin_nnz = 1760
+new_nnz = 362
+new_element = 741376
+need_speed_up = 421.23636
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 8
+r = 8
+origin_nnz = 1760
+new_nnz = 244
+new_element = 15616
+need_speed_up = 8.872727
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 32
+r = 4
+origin_nnz = 1760
+new_nnz = 235
+new_element = 30080
+need_speed_up = 17.09091
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 16
+r = 16
+origin_nnz = 1760
+new_nnz = 112
+new_element = 28672
+need_speed_up = 16.290909
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 32
+r = 32
+origin_nnz = 1760
+new_nnz = 48
+new_element = 49152
+need_speed_up = 27.927273
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 16
+r = 32
+origin_nnz = 1760
+new_nnz = 80
+new_element = 40960
+need_speed_up = 23.272728
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 32
+r = 64
+origin_nnz = 1760
+new_nnz = 36
+new_element = 73728
+need_speed_up = 41.890907
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 16
+r = 64
+origin_nnz = 1760
+new_nnz = 62
+new_element = 63488
+need_speed_up = 36.072727
+
+[[all]]
+file = 'mtx/plskz362.mtx'
+c = 64
+r = 4
+origin_nnz = 1760
+new_nnz = 205
+new_element = 52480
+need_speed_up = 29.818182
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 64
+r = 1
+origin_nnz = 294
+new_nnz = 75
+new_element = 4800
+need_speed_up = 16.32653
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 128
+r = 1
+origin_nnz = 294
+new_nnz = 67
+new_element = 8576
+need_speed_up = 29.170069
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 256
+r = 1
+origin_nnz = 294
+new_nnz = 67
+new_element = 17152
+need_speed_up = 58.340137
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 512
+r = 1
+origin_nnz = 294
+new_nnz = 67
+new_element = 34304
+need_speed_up = 116.680275
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 1024
+r = 1
+origin_nnz = 294
+new_nnz = 67
+new_element = 68608
+need_speed_up = 233.36055
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 2048
+r = 1
+origin_nnz = 294
+new_nnz = 67
+new_element = 137216
+need_speed_up = 466.7211
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 8
+r = 8
+origin_nnz = 294
+new_nnz = 43
+new_element = 2752
+need_speed_up = 9.360544
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 32
+r = 4
+origin_nnz = 294
+new_nnz = 31
+new_element = 3968
+need_speed_up = 13.496598
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 16
+r = 16
+origin_nnz = 294
+new_nnz = 18
+new_element = 4608
+need_speed_up = 15.67347
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 32
+r = 32
+origin_nnz = 294
+new_nnz = 7
+new_element = 7168
+need_speed_up = 24.380953
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 16
+r = 32
+origin_nnz = 294
+new_nnz = 12
+new_element = 6144
+need_speed_up = 20.897959
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 32
+r = 64
+origin_nnz = 294
+new_nnz = 5
+new_element = 10240
+need_speed_up = 34.829933
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 16
+r = 64
+origin_nnz = 294
+new_nnz = 8
+new_element = 8192
+need_speed_up = 27.863945
+
+[[all]]
+file = 'mtx/west0067.mtx'
+c = 64
+r = 4
+origin_nnz = 294
+new_nnz = 21
+new_element = 5376
+need_speed_up = 18.285715
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 64
+r = 1
+origin_nnz = 29
+new_nnz = 11
+new_element = 704
+need_speed_up = 24.275862
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 128
+r = 1
+origin_nnz = 29
+new_nnz = 11
+new_element = 1408
+need_speed_up = 48.551723
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 256
+r = 1
+origin_nnz = 29
+new_nnz = 11
+new_element = 2816
+need_speed_up = 97.10345
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 512
+r = 1
+origin_nnz = 29
+new_nnz = 11
+new_element = 5632
+need_speed_up = 194.2069
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 1024
+r = 1
+origin_nnz = 29
+new_nnz = 11
+new_element = 11264
+need_speed_up = 388.4138
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 2048
+r = 1
+origin_nnz = 29
+new_nnz = 11
+new_element = 22528
+need_speed_up = 776.8276
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 8
+r = 8
+origin_nnz = 29
+new_nnz = 4
+new_element = 256
+need_speed_up = 8.827586
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 32
+r = 4
+origin_nnz = 29
+new_nnz = 3
+new_element = 384
+need_speed_up = 13.24138
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 16
+r = 16
+origin_nnz = 29
+new_nnz = 2
+new_element = 512
+need_speed_up = 17.655172
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 32
+r = 32
+origin_nnz = 29
+new_nnz = 1
+new_element = 1024
+need_speed_up = 35.310345
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 16
+r = 32
+origin_nnz = 29
+new_nnz = 2
+new_element = 1024
+need_speed_up = 35.310345
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 32
+r = 64
+origin_nnz = 29
+new_nnz = 1
+new_element = 2048
+need_speed_up = 70.62069
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 16
+r = 64
+origin_nnz = 29
+new_nnz = 2
+new_element = 2048
+need_speed_up = 70.62069
+
+[[all]]
+file = 'mtx/lpi_itest6.mtx'
+c = 64
+r = 4
+origin_nnz = 29
+new_nnz = 3
+new_element = 768
+need_speed_up = 26.48276
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 64
+r = 1
+origin_nnz = 745
+new_nnz = 205
+new_element = 13120
+need_speed_up = 17.610739
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 128
+r = 1
+origin_nnz = 745
+new_nnz = 175
+new_element = 22400
+need_speed_up = 30.067114
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 256
+r = 1
+origin_nnz = 745
+new_nnz = 161
+new_element = 41216
+need_speed_up = 55.32349
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 512
+r = 1
+origin_nnz = 745
+new_nnz = 161
+new_element = 82432
+need_speed_up = 110.64698
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 1024
+r = 1
+origin_nnz = 745
+new_nnz = 161
+new_element = 164864
+need_speed_up = 221.29396
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 2048
+r = 1
+origin_nnz = 745
+new_nnz = 161
+new_element = 329728
+need_speed_up = 442.58792
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 8
+r = 8
+origin_nnz = 745
+new_nnz = 85
+new_element = 5440
+need_speed_up = 7.3020134
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 32
+r = 4
+origin_nnz = 745
+new_nnz = 71
+new_element = 9088
+need_speed_up = 12.198658
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 16
+r = 16
+origin_nnz = 745
+new_nnz = 31
+new_element = 7936
+need_speed_up = 10.6523485
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 32
+r = 32
+origin_nnz = 745
+new_nnz = 16
+new_element = 16384
+need_speed_up = 21.991947
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 16
+r = 32
+origin_nnz = 745
+new_nnz = 21
+new_element = 10752
+need_speed_up = 14.432215
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 32
+r = 64
+origin_nnz = 745
+new_nnz = 10
+new_element = 20480
+need_speed_up = 27.489933
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 16
+r = 64
+origin_nnz = 745
+new_nnz = 15
+new_element = 15360
+need_speed_up = 20.617449
+
+[[all]]
+file = 'mtx/pts5ldd03.mtx'
+c = 64
+r = 4
+origin_nnz = 745
+new_nnz = 53
+new_element = 13568
+need_speed_up = 18.21208
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 64
+r = 1
+origin_nnz = 13036
+new_nnz = 9180
+new_element = 587520
+need_speed_up = 45.06904
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 128
+r = 1
+origin_nnz = 13036
+new_nnz = 8931
+new_element = 1143168
+need_speed_up = 87.69316
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 256
+r = 1
+origin_nnz = 13036
+new_nnz = 8678
+new_element = 2221568
+need_speed_up = 170.41792
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 512
+r = 1
+origin_nnz = 13036
+new_nnz = 8505
+new_element = 4354560
+need_speed_up = 334.0411
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 1024
+r = 1
+origin_nnz = 13036
+new_nnz = 8366
+new_element = 8566784
+need_speed_up = 657.1636
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 2048
+r = 1
+origin_nnz = 13036
+new_nnz = 8268
+new_element = 16932864
+need_speed_up = 1298.9309
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 8
+r = 8
+origin_nnz = 13036
+new_nnz = 2899
+new_element = 185536
+need_speed_up = 14.232587
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 32
+r = 4
+origin_nnz = 13036
+new_nnz = 3230
+new_element = 413440
+need_speed_up = 31.71525
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 16
+r = 16
+origin_nnz = 13036
+new_nnz = 1774
+new_element = 454144
+need_speed_up = 34.83768
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 32
+r = 32
+origin_nnz = 13036
+new_nnz = 1071
+new_element = 1096704
+need_speed_up = 84.128876
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 16
+r = 32
+origin_nnz = 13036
+new_nnz = 1421
+new_element = 727552
+need_speed_up = 55.810986
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 32
+r = 64
+origin_nnz = 13036
+new_nnz = 825
+new_element = 1689600
+need_speed_up = 129.6103
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 16
+r = 64
+origin_nnz = 13036
+new_nnz = 1144
+new_element = 1171456
+need_speed_up = 89.86315
+
+[[all]]
+file = 'mtx/Pd.mtx'
+c = 64
+r = 4
+origin_nnz = 13036
+new_nnz = 2902
+new_element = 742912
+need_speed_up = 56.98926
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 64
+r = 1
+origin_nnz = 572
+new_nnz = 270
+new_element = 17280
+need_speed_up = 30.20979
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 128
+r = 1
+origin_nnz = 572
+new_nnz = 228
+new_element = 29184
+need_speed_up = 51.02098
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 256
+r = 1
+origin_nnz = 572
+new_nnz = 207
+new_element = 52992
+need_speed_up = 92.64336
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 512
+r = 1
+origin_nnz = 572
+new_nnz = 207
+new_element = 105984
+need_speed_up = 185.28671
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 1024
+r = 1
+origin_nnz = 572
+new_nnz = 207
+new_element = 211968
+need_speed_up = 370.57343
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 2048
+r = 1
+origin_nnz = 572
+new_nnz = 207
+new_element = 423936
+need_speed_up = 741.14685
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 8
+r = 8
+origin_nnz = 572
+new_nnz = 106
+new_element = 6784
+need_speed_up = 11.86014
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 32
+r = 4
+origin_nnz = 572
+new_nnz = 100
+new_element = 12800
+need_speed_up = 22.377623
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 16
+r = 16
+origin_nnz = 572
+new_nnz = 50
+new_element = 12800
+need_speed_up = 22.377623
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 32
+r = 32
+origin_nnz = 572
+new_nnz = 27
+new_element = 27648
+need_speed_up = 48.335663
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 16
+r = 32
+origin_nnz = 572
+new_nnz = 38
+new_element = 19456
+need_speed_up = 34.013985
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 32
+r = 64
+origin_nnz = 572
+new_nnz = 18
+new_element = 36864
+need_speed_up = 64.447556
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 16
+r = 64
+origin_nnz = 572
+new_nnz = 27
+new_element = 27648
+need_speed_up = 48.335663
+
+[[all]]
+file = 'mtx/impcol_a.mtx'
+c = 64
+r = 4
+origin_nnz = 572
+new_nnz = 84
+new_element = 21504
+need_speed_up = 37.594406
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 64
+r = 1
+origin_nnz = 81
+new_nnz = 19
+new_element = 1216
+need_speed_up = 15.012345
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 128
+r = 1
+origin_nnz = 81
+new_nnz = 19
+new_element = 2432
+need_speed_up = 30.02469
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 256
+r = 1
+origin_nnz = 81
+new_nnz = 19
+new_element = 4864
+need_speed_up = 60.04938
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 512
+r = 1
+origin_nnz = 81
+new_nnz = 19
+new_element = 9728
+need_speed_up = 120.09876
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 1024
+r = 1
+origin_nnz = 81
+new_nnz = 19
+new_element = 19456
+need_speed_up = 240.19753
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 2048
+r = 1
+origin_nnz = 81
+new_nnz = 19
+new_element = 38912
+need_speed_up = 480.39505
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 8
+r = 8
+origin_nnz = 81
+new_nnz = 9
+new_element = 576
+need_speed_up = 7.111111
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 32
+r = 4
+origin_nnz = 81
+new_nnz = 6
+new_element = 768
+need_speed_up = 9.481482
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 16
+r = 16
+origin_nnz = 81
+new_nnz = 4
+new_element = 1024
+need_speed_up = 12.641975
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 32
+r = 32
+origin_nnz = 81
+new_nnz = 1
+new_element = 1024
+need_speed_up = 12.641975
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 16
+r = 32
+origin_nnz = 81
+new_nnz = 2
+new_element = 1024
+need_speed_up = 12.641975
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 32
+r = 64
+origin_nnz = 81
+new_nnz = 1
+new_element = 2048
+need_speed_up = 25.28395
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 16
+r = 64
+origin_nnz = 81
+new_nnz = 2
+new_element = 2048
+need_speed_up = 25.28395
+
+[[all]]
+file = 'mtx/Ragusa16.mtx'
+c = 64
+r = 4
+origin_nnz = 81
+new_nnz = 6
+new_element = 1536
+need_speed_up = 18.962963
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 64
+r = 1
+origin_nnz = 264
+new_nnz = 46
+new_element = 2944
+need_speed_up = 11.151515
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 128
+r = 1
+origin_nnz = 264
+new_nnz = 46
+new_element = 5888
+need_speed_up = 22.30303
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 256
+r = 1
+origin_nnz = 264
+new_nnz = 46
+new_element = 11776
+need_speed_up = 44.60606
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 512
+r = 1
+origin_nnz = 264
+new_nnz = 46
+new_element = 23552
+need_speed_up = 89.21212
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 1024
+r = 1
+origin_nnz = 264
+new_nnz = 46
+new_element = 47104
+need_speed_up = 178.42424
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 2048
+r = 1
+origin_nnz = 264
+new_nnz = 46
+new_element = 94208
+need_speed_up = 356.84848
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 8
+r = 8
+origin_nnz = 264
+new_nnz = 32
+new_element = 2048
+need_speed_up = 7.757576
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 32
+r = 4
+origin_nnz = 264
+new_nnz = 20
+new_element = 2560
+need_speed_up = 9.69697
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 16
+r = 16
+origin_nnz = 264
+new_nnz = 9
+new_element = 2304
+need_speed_up = 8.727273
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 32
+r = 32
+origin_nnz = 264
+new_nnz = 4
+new_element = 4096
+need_speed_up = 15.515152
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 16
+r = 32
+origin_nnz = 264
+new_nnz = 6
+new_element = 3072
+need_speed_up = 11.636364
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 32
+r = 64
+origin_nnz = 264
+new_nnz = 2
+new_element = 4096
+need_speed_up = 15.515152
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 16
+r = 64
+origin_nnz = 264
+new_nnz = 3
+new_element = 3072
+need_speed_up = 11.636364
+
+[[all]]
+file = 'mtx/GD97_b.mtx'
+c = 64
+r = 4
+origin_nnz = 264
+new_nnz = 12
+new_element = 3072
+need_speed_up = 11.636364
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 64
+r = 1
+origin_nnz = 298
+new_nnz = 137
+new_element = 8768
+need_speed_up = 29.42282
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 128
+r = 1
+origin_nnz = 298
+new_nnz = 100
+new_element = 12800
+need_speed_up = 42.953022
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 256
+r = 1
+origin_nnz = 298
+new_nnz = 100
+new_element = 25600
+need_speed_up = 85.906044
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 512
+r = 1
+origin_nnz = 298
+new_nnz = 100
+new_element = 51200
+need_speed_up = 171.81209
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 1024
+r = 1
+origin_nnz = 298
+new_nnz = 100
+new_element = 102400
+need_speed_up = 343.62418
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 2048
+r = 1
+origin_nnz = 298
+new_nnz = 100
+new_element = 204800
+need_speed_up = 687.24835
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 8
+r = 8
+origin_nnz = 298
+new_nnz = 37
+new_element = 2368
+need_speed_up = 7.9463086
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 32
+r = 4
+origin_nnz = 298
+new_nnz = 45
+new_element = 5760
+need_speed_up = 19.32886
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 16
+r = 16
+origin_nnz = 298
+new_nnz = 19
+new_element = 4864
+need_speed_up = 16.322147
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 32
+r = 32
+origin_nnz = 298
+new_nnz = 10
+new_element = 10240
+need_speed_up = 34.362415
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 16
+r = 32
+origin_nnz = 298
+new_nnz = 15
+new_element = 7680
+need_speed_up = 25.771812
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 32
+r = 64
+origin_nnz = 298
+new_nnz = 7
+new_element = 14336
+need_speed_up = 48.107384
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 16
+r = 64
+origin_nnz = 298
+new_nnz = 11
+new_element = 11264
+need_speed_up = 37.798656
+
+[[all]]
+file = 'mtx/arrow.mtx'
+c = 64
+r = 4
+origin_nnz = 298
+new_nnz = 35
+new_element = 8960
+need_speed_up = 30.067114
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 64
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 896
+need_speed_up = 19.47826
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 128
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 1792
+need_speed_up = 38.95652
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 256
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 3584
+need_speed_up = 77.91304
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 512
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 7168
+need_speed_up = 155.82608
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 1024
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 14336
+need_speed_up = 311.65216
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 2048
+r = 1
+origin_nnz = 46
+new_nnz = 14
+new_element = 28672
+need_speed_up = 623.3043
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 8
+r = 8
+origin_nnz = 46
+new_nnz = 4
+new_element = 256
+need_speed_up = 5.5652175
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 32
+r = 4
+origin_nnz = 46
+new_nnz = 4
+new_element = 512
+need_speed_up = 11.130435
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 16
+r = 16
+origin_nnz = 46
+new_nnz = 1
+new_element = 256
+need_speed_up = 5.5652175
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 32
+r = 32
+origin_nnz = 46
+new_nnz = 1
+new_element = 1024
+need_speed_up = 22.26087
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 16
+r = 32
+origin_nnz = 46
+new_nnz = 1
+new_element = 512
+need_speed_up = 11.130435
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 32
+r = 64
+origin_nnz = 46
+new_nnz = 1
+new_element = 2048
+need_speed_up = 44.52174
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 16
+r = 64
+origin_nnz = 46
+new_nnz = 1
+new_element = 1024
+need_speed_up = 22.26087
+
+[[all]]
+file = 'mtx/lfat5b.mtx'
+c = 64
+r = 4
+origin_nnz = 46
+new_nnz = 4
+new_element = 1024
+need_speed_up = 22.26087
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 64
+r = 1
+origin_nnz = 6
+new_nnz = 3
+new_element = 192
+need_speed_up = 32.0
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 128
+r = 1
+origin_nnz = 6
+new_nnz = 3
+new_element = 384
+need_speed_up = 64.0
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 256
+r = 1
+origin_nnz = 6
+new_nnz = 3
+new_element = 768
+need_speed_up = 128.0
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 512
+r = 1
+origin_nnz = 6
+new_nnz = 3
+new_element = 1536
+need_speed_up = 256.0
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 1024
+r = 1
+origin_nnz = 6
+new_nnz = 3
+new_element = 3072
+need_speed_up = 512.0
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 2048
+r = 1
+origin_nnz = 6
+new_nnz = 3
+new_element = 6144
+need_speed_up = 1024.0
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 8
+r = 8
+origin_nnz = 6
+new_nnz = 1
+new_element = 64
+need_speed_up = 10.666667
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 32
+r = 4
+origin_nnz = 6
+new_nnz = 1
+new_element = 128
+need_speed_up = 21.333334
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 16
+r = 16
+origin_nnz = 6
+new_nnz = 1
+new_element = 256
+need_speed_up = 42.666668
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 32
+r = 32
+origin_nnz = 6
+new_nnz = 1
+new_element = 1024
+need_speed_up = 170.66667
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 16
+r = 32
+origin_nnz = 6
+new_nnz = 1
+new_element = 512
+need_speed_up = 85.333336
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 32
+r = 64
+origin_nnz = 6
+new_nnz = 1
+new_element = 2048
+need_speed_up = 341.33334
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 16
+r = 64
+origin_nnz = 6
+new_nnz = 1
+new_element = 1024
+need_speed_up = 170.66667
+
+[[all]]
+file = 'mtx/rza.mtx'
+c = 64
+r = 4
+origin_nnz = 6
+new_nnz = 1
+new_element = 256
+need_speed_up = 42.666668
