@@ -15,7 +15,7 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
 }
 fn main() -> Result<()> {
     let start_time = std::time::Instant::now();
-    init_log("warn");
+    init_log("info");
     let args = Args::parse();
 
     if let Some(generator) = args.generator {
@@ -52,5 +52,7 @@ fn main() -> Result<()> {
             .duration_since(start_time)
             .as_secs_f64()
     );
+    info!("the list of files succeeded: {:?}", ok_list);
+    info!("the list of files failed: {:?}", err_list);
     Ok(())
 }
