@@ -5,6 +5,8 @@ pub mod run;
 pub mod settings;
 pub mod utils;
 pub mod bsr_row_builder;
+pub mod pim;
+
 #[cfg(test)]
 mod test {
     use eyre::Result;

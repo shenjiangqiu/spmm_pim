@@ -1,26 +1,41 @@
+use config::File;
+use std::path::Path;
 use std::path::PathBuf;
 
 use config::Config;
-use eyre::eyre;
 use eyre::Context;
 use eyre::Result;
+use itertools::Itertools;
 use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+pub struct MemSettings {
+    pub row_size: usize,
+    pub banks: usize,
+    pub chips: usize,
+    pub channels: usize,
+}
 #[derive(Deserialize, Debug)]
 pub struct Settings {
     pub mtx_files: Vec<PathBuf>,
     pub result_file: PathBuf,
+    pub mem_settings: MemSettings,
 }
 
 impl Settings {
-    pub fn new(config: PathBuf) -> Result<Self> {
-        let name = config.to_str().ok_or(eyre!("Invalid path"))?;
-        let settings = Config::builder()
-            .add_source(config::File::with_name(name))
+    pub fn new(config: &[impl AsRef<Path>]) -> Result<Self> {
+        let names = config
+            .iter()
+            .map(AsRef::as_ref)
+            .map(File::from)
+            .collect_vec();
+        let ret = Config::builder()
+            .add_source(names)
             .build()
-            .wrap_err("cannot build Setting object")?;
-        let ret = settings
+            .wrap_err("fail to build setting")?
             .try_deserialize()
-            .wrap_err("failed to deserialize")?;
+            .wrap_err("fail to deserialize")?;
+
         Ok(ret)
     }
 }

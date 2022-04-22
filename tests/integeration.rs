@@ -5,15 +5,16 @@ use spmm_pim::result::save_result_list;
 use spmm_pim::run::run_exp;
 use spmm_pim::run_1d_c_unroll;
 use spmm_pim::{result::Results, settings::Settings};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn test() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("debug"))
         .try_init()
         .unwrap_or_default();
-
-    let settings = Settings::new("configs/default.toml".into())?;
+    let config_files: Vec<PathBuf> =
+        vec!["configs/default.toml".into(), "configs/ddr4.toml".into()];
+    let settings = Settings::new(&config_files)?;
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files;
 

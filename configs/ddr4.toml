@@ -1,0 +1,5 @@
+[mem_settings]
+row_size = 2048
+banks = 8
+chips = 8
+channels = 2
