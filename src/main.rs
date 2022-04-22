@@ -1,7 +1,7 @@
 use std::io;
 
-use clap::{Parser, Command, IntoApp};
-use clap_complete::{Generator};
+use clap::{Command, IntoApp, Parser};
+use clap_complete::Generator;
 use eyre::{Context, Result};
 use log::{debug, info};
 use spmm_pim::result::save_result_list;
@@ -25,11 +25,13 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-
     debug!("{:?}", args);
 
-    let settings = Settings::new(args.config_file.unwrap_or("default.toml".into()))
-        .wrap_err("fail to create Setting object")?;
+    let settings = Settings::new(
+        args.config_file
+            .unwrap_or_else(|| "configs/default.toml".into()),
+    )
+    .wrap_err("fail to create Setting object")?;
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files.clone();
 

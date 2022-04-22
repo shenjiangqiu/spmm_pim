@@ -9,20 +9,29 @@ pub struct BsrRowbuilder<N, I, const C: usize, const R: usize> {
     current_nnz: usize,
 }
 
+impl<N, I, const C: usize, const R: usize> Default for BsrRowbuilder<N, I, C, R>
+where
+    N: Default + Copy + Clone,
+    I: SpIndex,
+{
+    fn default() -> Self {
+        BsrRowbuilder {
+            data: vec![[[N::default(); C]; R]; R],
+            index: vec![],
+            current_working_window: [[N::default(); C]; R],
+            current_c: 0,
+            current_nnz: 0,
+        }
+    }
+}
+
 impl<N, I, const C: usize, const R: usize> BsrRowbuilder<N, I, C, R>
 where
     N: Default + Copy + Clone,
     I: SpIndex,
 {
     pub fn new() -> Self {
-        let a = N::default();
-        BsrRowbuilder {
-            data: vec![],
-            index: vec![],
-            current_working_window: [[a; C]; R],
-            current_c: 0,
-            current_nnz: 0,
-        }
+        Self::default()
     }
     ///  gradually push index and data into the builder, the index ***must*** from small to large
     /// It can handle the the case the the column size is not multiple of C

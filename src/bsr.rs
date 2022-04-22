@@ -140,7 +140,7 @@ mod test {
     #[test]
     fn test_bsr() {
         init_log("debug");
-        let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<2, 2, _> = Bsr::from(csr);
         let true_bsr = Bsr {
@@ -161,7 +161,7 @@ mod test {
     #[test]
     fn test_unalign() {
         init_log("debug");
-        let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx").unwrap();
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<4, 4, _> = Bsr::from(csr);
         // let true_bsr = Bsr {
@@ -182,7 +182,7 @@ mod test {
 
     #[test]
     fn test_big() -> Result<()> {
-        let matrix: TriMat<i32> = sprs::io::read_matrix_market("test.mtx")?;
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?;
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<1, 16, _> = Bsr::from(csr);
         let ptr = IndPtrBase::new_checked(vec![0, 1, 2, 3, 4, 5, 6]).map_err(|e| e.1)?;
