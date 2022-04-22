@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::{bsr::Bsr, result::SingleResult};
 use eyre::Result;
-use log::{ debug};
+use log::debug;
 use sprs::{CsMat, TriMat};
 pub fn run_exp<const R: usize, const C: usize>(filename: &Path) -> Result<SingleResult> {
     let tri: TriMat<i32> = sprs::io::read_matrix_market(filename)?;
@@ -17,6 +17,7 @@ pub fn run_exp<const R: usize, const C: usize>(filename: &Path) -> Result<Single
         file: filename,
         r: R,
         c: C,
+        block_size: R * C,
         origin_nnz: csr_nnz,
         new_nnz: bsr.nnz(),
         new_element: bsr.nnz() * C * R,

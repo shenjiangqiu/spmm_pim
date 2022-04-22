@@ -85,4 +85,4 @@ mtx_files = [
     "mtx/rza.mtx",
 ]
 
-result_file = "all_size.json"
+result_file = "results/all_size.json"

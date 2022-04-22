@@ -16,7 +16,7 @@ where
 {
     fn default() -> Self {
         BsrRowbuilder {
-            data: vec![[[N::default(); C]; R]; R],
+            data: vec![],
             index: vec![],
             current_working_window: [[N::default(); C]; R],
             current_c: 0,
