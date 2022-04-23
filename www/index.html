@@ -107,6 +107,7 @@
   <a>upload the mtx file to git repo: <a href="https://github.com/shenjiangqiu/mtx_server/tree/master/mtx">https://github.com/shenjiangqiu/mtx_server/tree/master/mtx</a> and click update to update the list of banchmark</a><br>
   <input type="text" id="input" value="test.mtx">
   <button id="run">click to run</button>
+  <button id="runall">run all</button>
   <button id="copy" onclick="copytext();">copy</button>
   <button id="clear" onclick="console.log('clearing');clearresult();">clear</button>
   <button id="update" onclick="console.log('updating');update();">update file list</button>
@@ -144,6 +145,10 @@
       }
     }
     updatelist();
+    document.getElementById("runall").onclick=function(){
+      document.getElementById("input").value="";
+      document.getElementById("run").click();
+    }
   </script>
 </body>
 
