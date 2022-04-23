@@ -4,5 +4,14 @@
 import("./index.js")
   .catch(e => console.error("Error importing `index.js`:", e)).then((index)=>{
      console.log("index.js loaded");
-     document.getElementById("bt1").onclick = index.clickbt;
+     document.getElementById("run").onclick =function(){
+        this.innerHTML = "Running...";
+         let result_list = index.run().then((x)=>{
+            document.getElementById("result").innerHTML = x;
+
+            this.innerHTML="click to run";
+
+         });
+
+     }
   });

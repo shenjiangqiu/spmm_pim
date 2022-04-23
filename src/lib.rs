@@ -6,7 +6,6 @@ pub mod result;
 pub mod run;
 pub mod settings;
 pub mod utils;
-
 use std::{io::BufReader, path::Path};
 
 use bsr::Bsr;
@@ -14,16 +13,16 @@ use result::{Results, SingleResult};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub async fn run(name: String) -> String {
-    let res = reqwest::get(format!("http://localhost:8081/{}", name))
+pub async fn run1(name: String) -> Result<String, JsValue> {
+    let res = reqwest::get(format!("https://research.thesjq.com/files/{}", name))
         .await
-        .unwrap()
+        .map_err(JsError::from)?
         .text()
         .await
-        .unwrap();
+        .map_err(JsError::from)?;
 
     let mut buf = BufReader::new(res.as_bytes());
-    let trimat = sprs::io::read_matrix_market_from_bufread(&mut buf).unwrap();
+    let trimat = sprs::io::read_matrix_market_from_bufread(&mut buf).map_err(JsError::from)?;
 
     let csr = trimat.to_csr();
     let original_nnz = csr.nnz();
@@ -41,9 +40,7 @@ pub async fn run(name: String) -> String {
         new_element: bsr.nnz() * 2 * 2,
         need_speed_up: (bsr.nnz() * 2 * 2) as f32 / (original_nnz as f32),
     };
-    let mut all_result = Results { all: vec![] };
-    all_result.all.push(single_result);
-    serde_json::to_string_pretty(&all_result).unwrap()
+    serde_json::to_string_pretty(&single_result).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 #[cfg(test)]
