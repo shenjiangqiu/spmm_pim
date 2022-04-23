@@ -6,11 +6,19 @@ pub mod result;
 pub mod run;
 pub mod settings;
 pub mod utils;
-use std::{io::BufReader, path::Path};
 
-use bsr::Bsr;
 use result::{Results, SingleResult};
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
+
+use crate::run::run_exp_filebuf;
+
+#[derive(Serialize)]
+struct CombinedResult<'a> {
+    results: Vec<SingleResult<'a>>,
+    ok_list: Vec<&'a String>,
+    err_list: Vec<&'a String>,
+}
 
 #[wasm_bindgen]
 pub async fn run1(name: String) -> Result<String, JsValue> {
@@ -21,26 +29,23 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         .await
         .map_err(JsError::from)?;
 
-    let mut buf = BufReader::new(res.as_bytes());
-    let trimat = sprs::io::read_matrix_market_from_bufread(&mut buf).map_err(JsError::from)?;
+    let mut full_result = Results { all: vec![] };
+    let mut ok_list = vec![];
+    let mut err_list = vec![];
+    run_1d_c_unroll_buf!(&name;&res;full_result;ok_list;err_list; run_exp_filebuf; 64,128,256,512,1024,2048);
+    run_2d_unroll_buf!(&name;&res;full_result;ok_list;err_list; run_exp_filebuf; (2,32),(4,16),(8,8),(2,64),(4,32),(8,16),(2,128),(4,64),(8,32),(16,16),(2,256),(4,128),(8,64),(16,32),
+        (2,512),(4,256),(8,128),(16,64),(32,32), (2,1024),(4,512),(8,256),(16,128),(32,64));
+    if !err_list.is_empty() {
+        return Err(JsValue::from_str(&format!("{:?}", err_list)));
+    }
 
-    let csr = trimat.to_csr();
-    let original_nnz = csr.nnz();
-
-    let bsr: Bsr<2, 2, i32> = csr.into();
-
-    let path = Path::new("123.mtx");
-    let single_result = SingleResult {
-        file: path,
-        r: 2,
-        c: 2,
-        block_size: 2 * 2,
-        origin_nnz: original_nnz,
-        new_nnz: bsr.nnz(),
-        new_element: bsr.nnz() * 2 * 2,
-        need_speed_up: (bsr.nnz() * 2 * 2) as f32 / (original_nnz as f32),
+    let combined_result = CombinedResult {
+        results: full_result.all,
+        ok_list,
+        err_list,
     };
-    serde_json::to_string_pretty(&single_result).map_err(|e| JsValue::from_str(&e.to_string()))
+
+    serde_json::to_string_pretty(&combined_result).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 #[cfg(test)]

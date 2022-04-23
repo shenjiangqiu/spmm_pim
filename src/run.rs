@@ -1,9 +1,38 @@
-use std::path::Path;
+use std::{io::BufReader, path::Path};
 
 use crate::{bsr::Bsr, result::SingleResult};
 use eyre::Result;
 use log::debug;
 use sprs::{CsMat, TriMat};
+
+pub fn run_exp_filebuf<'a, const R: usize, const C: usize>(
+    filename: &'a str,
+    filebuf: &str,
+) -> Result<SingleResult<'a>> {
+    let mut filebuf = BufReader::new(filebuf.as_bytes());
+    let tri: TriMat<i32> = sprs::io::read_matrix_market_from_bufread(&mut filebuf)?;
+    let csr: CsMat<_> = tri.to_csr();
+    debug!("original_csr nnz: {}", csr.nnz());
+    let csr_nnz = csr.nnz();
+    let bsr: Bsr<R, C, _> = Bsr::from(csr);
+
+    debug!("bsr_{}_{}_nnz: {}", R, C, bsr.nnz());
+    debug!("bsr_{}_{}_element: {}", R, C, bsr.nnz() * C * R);
+    let path = Path::new(filename);
+    let single_result = SingleResult {
+        file: path,
+        r: R,
+        c: C,
+        block_size: R * C,
+        origin_nnz: csr_nnz,
+        new_nnz: bsr.nnz(),
+        new_element: bsr.nnz() * C * R,
+        need_speed_up: (bsr.nnz() * C * R) as f32 / (csr_nnz as f32),
+    };
+    debug!("{:?}", single_result);
+    Ok(single_result)
+}
+
 pub fn run_exp<const R: usize, const C: usize>(filename: &Path) -> Result<SingleResult> {
     let tri: TriMat<i32> = sprs::io::read_matrix_market(filename)?;
     let csr: CsMat<_> = tri.to_csr();
@@ -33,8 +62,11 @@ macro_rules! run_1d_c_unroll {
         $fun::<1,$size0>($file).map_or_else(
             |_| {
                 $err_list.push($file);
+
             },
-            |x| {$full_result.all.push(x);$ok_list.push($file);},
+            |x| {
+                $full_result.all.push(x);$ok_list.push($file);
+            },
         );
     };
     ($file:expr;$full_result:expr;$ok_list:expr;$err_list:expr;$fun:ident; $size0:literal, $($size:literal),+) => {
@@ -43,7 +75,8 @@ macro_rules! run_1d_c_unroll {
                 $err_list.push($file);
             },
 
-            |x| {$full_result.all.push(x);$ok_list.push($file);},
+            |x| {$full_result.all.push(x);$ok_list.push($file);
+            },
         );
 
         run_1d_c_unroll!($file;$full_result;$ok_list;$err_list; $fun;  $($size),+ );
@@ -71,6 +104,59 @@ macro_rules! run_2d_unroll {
         );
 
         run_2d_unroll!($file;$full_result;$ok_list;$err_list; $fun;  $(($r1,$c1)),+ );
+    };
+
+}
+
+#[macro_export]
+macro_rules! run_1d_c_unroll_buf {
+    ($file:expr;$file_buf:expr;$full_result:expr;$ok_list:expr;$err_list:expr;$fun:ident; $size0:literal)=>{
+        $fun::<1,$size0>($file,$file_buf).map_or_else(
+            |_| {
+                $err_list.push($file);
+            },
+            |x| {
+                $full_result.all.push(x);$ok_list.push($file);
+            },
+        );
+    };
+    ($file:expr;$file_buf:expr;$full_result:expr;$ok_list:expr;$err_list:expr;$fun:ident; $size0:literal, $($size:literal),+) => {
+        $fun::<1,$size0>($file,$file_buf).map_or_else(
+            |_| {
+                $err_list.push($file);
+            },
+
+            |x| {
+                $full_result.all.push(x);$ok_list.push($file);
+            },
+        );
+
+
+        run_1d_c_unroll_buf!($file;$file_buf;$full_result;$ok_list;$err_list; $fun;  $($size),+ );
+    };
+
+}
+
+#[macro_export]
+macro_rules! run_2d_unroll_buf {
+    ($file:expr;$file_buf:expr;$full_result:expr;$ok_list:expr;$err_list:expr;$fun:ident; ($r:literal,$c:literal))=>{
+        $fun::<$r,$c>($file,$file_buf).map_or_else(
+            |_| {
+                $err_list.push($file);
+            },
+            |x| {$full_result.all.push(x);$ok_list.push($file);},
+        );
+    };
+    ($file:expr;$file_buf:expr;$full_result:expr;$ok_list:expr;$err_list:expr;$fun:ident; ($r:literal,$c:literal), $(($r1:literal,$c1:literal)),+) => {
+        $fun::<$r,$c>($file,$file_buf).map_or_else(
+            |_| {
+                $err_list.push($file);
+            },
+
+            |x| {$full_result.all.push(x);$ok_list.push($file);},
+        );
+
+        run_2d_unroll_buf!($file;$file_buf;$full_result;$ok_list;$err_list; $fun;  $(($r1,$c1)),+ );
     };
 
 }

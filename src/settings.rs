@@ -8,12 +8,19 @@ use eyre::Result;
 use itertools::Itertools;
 use serde::Deserialize;
 
+#[derive(Debug, Deserialize)]
+pub enum RowMapping {
+    Chunck,
+    Interleaved,
+}
 #[derive(Deserialize, Debug)]
 pub struct MemSettings {
     pub row_size: usize,
     pub banks: usize,
     pub chips: usize,
     pub channels: usize,
+    pub row_mapping: RowMapping,
+    pub bank_merger_size: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {
