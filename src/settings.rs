@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub enum RowMapping {
-    Chunck,
+    Chunk,
     Interleaved,
 }
 #[derive(Deserialize, Debug)]
@@ -20,7 +20,11 @@ pub struct MemSettings {
     pub chips: usize,
     pub channels: usize,
     pub row_mapping: RowMapping,
+
+    // the merger
     pub bank_merger_size: usize,
+    pub chip_merger_size: usize,
+    pub channel_merger_size: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

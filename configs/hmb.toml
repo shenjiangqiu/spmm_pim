@@ -1,8 +1,8 @@
 [mem_settings]
-row_size = 512
+row_size = 8192
 banks = 8
 chips = 8
-channels = 2
+channels = 8
 row_mapping="Chunk"
 bank_merger_size=16
 chip_merger_size=8
