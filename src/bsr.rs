@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::debug;
-use sprs::{CsMatBase, IndPtr, IndPtrBase, SpIndex};
+use sprs::{CsMat, CsMatBase, IndPtr, IndPtrBase, SpIndex};
 use std::ops::Deref;
 
 use crate::bsr_row_builder::BsrRowbuilder;
@@ -21,9 +21,34 @@ pub struct Bsr<
     IndStorage: Deref<Target = [I]>,
     DataStorage: Deref<Target = [[[N; C]; R]]>,
 {
+    rows: usize,
+    cols: usize,
     data: DataStorage,
     index: IndStorage,
     ptr: IndPtrBase<Iptr, IptrStorage>,
+}
+
+impl<const R: usize, const C: usize, N> From<Bsr<R, C, N>> for CsMat<[[N; C]; R]> {
+    fn from(bsr: Bsr<R, C, N>) -> Self {
+        let Bsr {
+            rows,
+            cols,
+            data,
+            index,
+            ptr,
+        } = bsr;
+        let storage = ptr.into_raw_storage();
+        // this is safe when the BSR is a valid BSR, so it's safe!
+        unsafe {
+            CsMat::new_unchecked(
+                sprs::CompressedStorage::CSR,
+                (rows, cols),
+                storage,
+                index,
+                data,
+            )
+        }
+    }
 }
 
 impl<const R: usize, const C: usize, N, I, Iptr, IptrStorage, IndStorage, DataStorage>
@@ -35,8 +60,19 @@ where
     IndStorage: Deref<Target = [I]>,
     DataStorage: Deref<Target = [[[N; C]; R]]>,
 {
-    pub fn new(data: DataStorage, index: IndStorage, ptr: IndPtrBase<Iptr, IptrStorage>) -> Self {
-        Bsr { data, index, ptr }
+    pub fn new(
+        shape: (usize, usize),
+        data: DataStorage,
+        index: IndStorage,
+        ptr: IndPtrBase<Iptr, IptrStorage>,
+    ) -> Self {
+        Bsr {
+            data,
+            index,
+            ptr,
+            rows: shape.0,
+            cols: shape.1,
+        }
     }
     pub fn data(&self, index: usize) -> &[[N; C]; R] {
         &self.data[index]
@@ -127,7 +163,8 @@ where
 
         let iptr = IndPtr::new_checked(iptr).unwrap();
 
-        Self::new(data, index, iptr)
+        let shape = ((rows + R - 1) / R, (cols + C - 1) / C);
+        Self::new(shape, data, index, iptr)
     }
 }
 
@@ -154,6 +191,8 @@ mod test {
             ],
             index: vec![0, 1, 0, 1, 2, 2],
             ptr: IndPtrBase::new_checked(vec![0, 2, 5, 6]).unwrap(),
+            rows: 3,
+            cols: 3,
         };
         assert_eq!(bsr, true_bsr);
     }
@@ -197,8 +236,24 @@ mod test {
             ],
             index: vec![0, 0, 0, 0, 0, 0],
             ptr,
+            rows: 6,
+            cols: 1,
         };
         assert_eq!(bsr, true_value);
+        Ok(())
+    }
+
+    #[test]
+    fn test_bsr_to_csr() -> Result<()> {
+        init_log("debug");
+        let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?;
+        let csr: CsMat<_> = matrix.to_csr();
+        let bsr: Bsr<1, 16, _> = Bsr::from(csr);
+        let csr_from_bsr: CsMat<_> = bsr.into();
+        debug!("{:?}", csr_from_bsr);
+        for i in csr_from_bsr.iter() {
+            debug!("{:?}", i);
+        }
         Ok(())
     }
 }

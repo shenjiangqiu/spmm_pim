@@ -25,6 +25,9 @@ pub struct MemSettings {
     pub bank_merger_size: usize,
     pub chip_merger_size: usize,
     pub channel_merger_size: usize,
+
+    // the simd width(for bsr)
+    pub simd_width: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

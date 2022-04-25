@@ -6,7 +6,7 @@ pub mod result;
 pub mod run;
 pub mod settings;
 pub mod utils;
-
+pub mod csv_nodata;
 use result::{Results, SingleResult};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -53,6 +53,7 @@ mod test {
     use eyre::Result;
     use log::debug;
     use sprs::{CsMat, TriMat};
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     use crate::utils::init_log;
 
@@ -81,5 +82,9 @@ mod test {
         let bsr: super::bsr::Bsr<2, 2, _> = super::bsr::Bsr::from(matrix.to_csr());
         debug!("{:?}", bsr);
         Ok(())
+    }
+    #[wasm_bindgen_test]
+    fn test_wasm(){
+        
     }
 }
