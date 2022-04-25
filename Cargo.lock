@@ -1270,7 +1270,6 @@ dependencies = [
  "config",
  "env_logger",
  "eyre",
- "http",
  "itertools",
  "log",
  "reqwest",

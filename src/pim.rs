@@ -1,3 +1,5 @@
+//! the pim module
+
 use std::{fmt::Debug, ops::Deref};
 
 use itertools::Itertools;
@@ -6,16 +8,39 @@ use sprs::{vec, CsMatBase, SpIndex};
 
 use crate::{bsr::Bsr, settings::MemSettings};
 
+/// Partial sum
+/// for each element in `data`
+/// it contains the `(target_index, target_row_size)`
+
+#[derive(Clone, Debug)]
+pub struct PartialSum {
+    pub data: Vec<(usize, usize)>,
+}
+
+impl From<Vec<(usize, usize)>> for PartialSum {
+    fn from(data: Vec<(usize, usize)>) -> Self {
+        PartialSum { data }
+    }
+}
+
+impl Deref for PartialSum {
+    type Target = Vec<(usize, usize)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
 pub trait Pim {
     fn mem_rows(&self, mem_settings: &MemSettings) -> Vec<usize>;
-    fn bank_merge(&self, mem_settings: &MemSettings) -> (Vec<usize>, Vec<Vec<(usize, usize)>>);
+    fn bank_merge(&self, mem_settings: &MemSettings) -> (Vec<usize>, Vec<PartialSum>);
     fn bank_add(&self, mem_settings: &MemSettings) -> Vec<usize>;
     fn chip_add(&self, mem_settings: &MemSettings) -> Vec<usize>;
     fn chip_merge(
         &self,
         mem_settings: &MemSettings,
-        bank_merge_result: &Vec<Vec<(usize, usize)>>,
-    ) -> (Vec<usize>, Vec<Vec<(usize, usize)>>);
+        bank_merge_result: &Vec<PartialSum>,
+    ) -> (Vec<usize>, Vec<PartialSum>);
     fn channel_add(&self, mem_settings: &MemSettings) -> Vec<usize>;
     fn channel_merge(&self, mem_settings: &MemSettings) -> Vec<usize>;
 }
@@ -192,7 +217,7 @@ where
         result
     }
     // return how many merge operations are needed
-    fn bank_merge(&self, mem_settings: &MemSettings) -> (Vec<usize>, Vec<Vec<(usize, usize)>>) {
+    fn bank_merge(&self, mem_settings: &MemSettings) -> (Vec<usize>, Vec<PartialSum>) {
         let merger_size = mem_settings.bank_merger_size;
         let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
         let mut bank_tasks = vec![BankMergeTaskBuilder::default(); num_banks];
@@ -218,7 +243,7 @@ where
             .map(|x| x.build(merger_size))
             .for_each(|x| {
                 cycles.push(x.0);
-                merged_tasks.push(x.1);
+                merged_tasks.push(x.1.into());
             });
 
         (cycles, merged_tasks)
@@ -235,8 +260,8 @@ where
     fn chip_merge(
         &self,
         mem_settings: &MemSettings,
-        bank_merge_result: &Vec<Vec<(usize, usize)>>,
-    ) -> (Vec<usize>, Vec<Vec<(usize, usize)>>) {
+        bank_merge_result: &Vec<PartialSum>,
+    ) -> (Vec<usize>, Vec<PartialSum>) {
         // just like the bank merge, but istead take the result of bank level result
         for (bank_id, bank_result) in bank_merge_result.iter().enumerate() {
 
@@ -271,10 +296,7 @@ where
     fn bank_merge(
         &self,
         mem_settings: &MemSettings,
-    ) -> (
-        std::vec::Vec<usize>,
-        std::vec::Vec<std::vec::Vec<(usize, usize)>>,
-    ) {
+    ) -> (std::vec::Vec<usize>, std::vec::Vec<PartialSum>) {
         todo!()
     }
 
@@ -297,8 +319,8 @@ where
     fn chip_merge(
         &self,
         mem_settings: &MemSettings,
-        bank_merge_result: &Vec<Vec<(usize, usize)>>,
-    ) -> (Vec<usize>, Vec<Vec<(usize, usize)>>) {
+        bank_merge_result: &std::vec::Vec<PartialSum>,
+    ) -> (std::vec::Vec<usize>, std::vec::Vec<PartialSum>) {
         todo!()
     }
 }
