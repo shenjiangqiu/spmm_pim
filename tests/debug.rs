@@ -7,8 +7,8 @@ use spmm_pim::run_2d_unroll_buf;
 use spmm_pim::{result::Results, settings::Settings};
 use sprs::CsMat;
 use std::path::{Path, PathBuf};
-
-fn test() -> Result<()> {
+#[test]
+fn test_real_matrix() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("debug"))
         .try_init()
         .unwrap_or_default();
