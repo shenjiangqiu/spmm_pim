@@ -1,4 +1,8 @@
-use std::{fmt::Debug, iter::Sum, ops::Add};
+use std::{
+    fmt::Debug,
+    iter::Sum,
+    ops::{Add, Deref, DerefMut},
+};
 
 use sprs::{CsVecI, SpIndex};
 
@@ -11,12 +15,23 @@ where
     pub indices: Vec<I>,
 }
 
-impl<I> CsVecNodata<I>
+impl<I> Deref for CsVecNodata<I>
 where
     I: SpIndex,
 {
-    pub fn len(&self) -> usize {
-        self.indices.len()
+    type Target = Vec<I>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.indices
+    }
+}
+
+impl<I> DerefMut for CsVecNodata<I>
+where
+    I: SpIndex,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.indices
     }
 }
 
@@ -71,13 +86,8 @@ where
     where
         I: Iterator<Item = Self>,
     {
-        iter.fold(
-            CsVecNodata {
-                dim: 0,
-                indices: vec![],
-            },
-            Add::add,
-        )
+        // fix bug here, the init dim is not correct, so use reduce instead!
+        iter.reduce(|x, y| x + y).unwrap()
     }
 }
 
