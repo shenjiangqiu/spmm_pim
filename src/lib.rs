@@ -6,7 +6,9 @@ pub mod pim;
 pub mod result;
 pub mod run;
 pub mod settings;
+pub mod two_matrix;
 pub mod utils;
+
 use std::{io::BufReader, path::Path};
 
 use result::{Results, SingleResult};
@@ -25,7 +27,7 @@ struct CombinedResult<'a> {
     ok_list: Vec<&'a Path>,
     err_list: Vec<&'a Path>,
 }
-
+#[wasm_bindgen]
 pub async fn run1(name: String) -> Result<String, JsValue> {
     let res = reqwest::get(format!("https://research.thesjq.com/files/{}", name))
         .await
@@ -43,18 +45,19 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
     let mut ok_list = vec![];
     let mut err_list = vec![];
     let mem_settings = MemSettings {
-        row_size: 64,
-        banks: 1,
-        chips: 1,
-        channels: 1,
+        row_size: 512,
+        banks: 8,
+        chips: 8,
+        channels: 2,
         row_mapping: RowMapping::Chunk,
-        bank_merger_size: 1,
-        chip_merger_size: 1,
-        channel_merger_size: 1,
-        dimm_merger_size: 1,
-        simd_width: 1,
+        bank_merger_size: 8,
+        chip_merger_size: 8,
+        channel_merger_size: 8,
+        dimm_merger_size: 8,
+        simd_width: 128,
     };
     let csr: CsMat<_> = tri.to_csr();
+
     run_1d_c_unroll_buf!(path;&csr;&mem_settings;full_result;ok_list;err_list; run_exp_csr; 64,128,256,512,1024,2048);
     run_2d_unroll_buf!(path;&csr;&mem_settings;full_result;ok_list;err_list; run_exp_csr; (2,32),(4,16),(8,8),(2,64),(4,32),(8,16),(2,128),(4,64),(8,32),(16,16),(2,256),(4,128),(8,64),(16,32),
         (2,512),(4,256),(8,128),(16,64),(32,32), (2,1024),(4,512),(8,256),(16,128),(32,64));

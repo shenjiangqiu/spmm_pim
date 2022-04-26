@@ -1,11 +1,13 @@
 use std::{io::BufReader, path::Path};
 
-use crate::{bsr::Bsr, pim::Pim, result::SingleResult, settings::MemSettings};
+use crate::{
+    bsr::Bsr, pim::Pim, result::SingleResult, settings::MemSettings, two_matrix::TwoMatrix,
+};
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
 use sprs::{CsMat, TriMat};
-
+/// run the matrix csr x csr_transpose
 pub fn run_exp_csr<'a, const R: usize, const C: usize>(
     path: &'a Path,
     csr: &CsMat<i32>,
@@ -13,17 +15,23 @@ pub fn run_exp_csr<'a, const R: usize, const C: usize>(
 ) -> Result<SingleResult<'a>> {
     debug!("original_csr nnz: {}", csr.nnz());
     let oldnnz = csr.nnz();
+    let csr_transpose = csr.transpose_view().to_csr();
+
     let bsr: Bsr<R, C, _> = Bsr::from(csr.clone());
+    let bsr_transpose: Bsr<C, R, _> = Bsr::from(csr_transpose);
+    let new_nnz = bsr.nnz();
     debug!("bsr_{}_{}_nnz: {}", R, C, bsr.nnz());
     debug!("bsr_{}_{}_element: {}", R, C, bsr.nnz() * C * R);
 
     let csr: CsMat<_> = bsr.into();
+    let csr_transpose: CsMat<_> = bsr_transpose.into();
+    let two_mat = TwoMatrix::new(csr, csr_transpose);
 
-    let row_read = csr.mem_rows(mem_settings);
-    let (bank_merged_cycles, partial_sum) = csr.bank_merge(mem_settings);
-    let (chip_merged_cycles, partial_sum) = csr.chip_merge(mem_settings, &partial_sum);
-    let (channel_merged_cycles, partial_sum) = csr.channel_merge(mem_settings, &partial_sum);
-    let (dimm_merged_cycles, _partial_sum) = csr.dimm_merge(mem_settings, &partial_sum);
+    let row_read = two_mat.mem_rows(mem_settings);
+    let (bank_merged_cycles, partial_sum) = two_mat.bank_merge(mem_settings);
+    let (chip_merged_cycles, partial_sum) = two_mat.chip_merge(mem_settings, &partial_sum);
+    let (channel_merged_cycles, partial_sum) = two_mat.channel_merge(mem_settings, &partial_sum);
+    let (dimm_merged_cycles, _partial_sum) = two_mat.dimm_merge(mem_settings, &partial_sum);
 
     // decompose
     let bank_add = bank_merged_cycles.iter().map(|x| x.add_cycle).collect_vec();
@@ -54,9 +62,9 @@ pub fn run_exp_csr<'a, const R: usize, const C: usize>(
         c: C,
         block_size: R * C,
         origin_nnz: oldnnz,
-        new_nnz: csr.nnz(),
-        new_element: csr.nnz() * C * R,
-        need_speed_up: (csr.nnz() * C * R) as f32 / (oldnnz as f32),
+        new_nnz,
+        new_element: new_nnz * C * R,
+        need_speed_up: (new_nnz * C * R) as f32 / (oldnnz as f32),
         row_read,
         bank_add,
         bank_merge,

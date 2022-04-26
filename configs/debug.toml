@@ -1,0 +1,3 @@
+
+mtx_files = ["mtx/lp_e226.mtx"]
+result_file = "results/result.json"

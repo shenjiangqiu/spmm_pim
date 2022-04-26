@@ -125,7 +125,7 @@ pub trait Pim {
     ) -> (MergeCycle, PartialSum<usize>);
 }
 
-fn get_bank_id_from_row_id(row_id: usize, mem_settings: &MemSettings, num_rows: usize) -> usize {
+pub fn get_bank_id_from_row_id(row_id: usize, mem_settings: &MemSettings, num_rows: usize) -> usize {
     let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
     match mem_settings.row_mapping {
         crate::settings::RowMapping::Chunk => {
@@ -146,7 +146,7 @@ fn get_bank_id_from_row_id(row_id: usize, mem_settings: &MemSettings, num_rows: 
     }
 }
 
-fn get_row_id_in_bank(row_id: usize, mem_settings: &MemSettings, num_rows: usize) -> usize {
+pub fn get_row_id_in_bank(row_id: usize, mem_settings: &MemSettings, num_rows: usize) -> usize {
     let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
     match mem_settings.row_mapping {
         crate::settings::RowMapping::Chunk => {
@@ -162,7 +162,7 @@ fn get_row_id_in_bank(row_id: usize, mem_settings: &MemSettings, num_rows: usize
 }
 
 #[derive(Debug, Clone)]
-struct AdderTaskBuilder<I>
+pub struct AdderTaskBuilder<I>
 where
     I: SpIndex,
 {
@@ -187,7 +187,7 @@ impl<T> AdderTaskBuilder<T>
 where
     T: SpIndex,
 {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -197,7 +197,7 @@ where
     ///
     ///
     ///
-    fn add_task(&mut self, (to, vec): (usize, CsVecNodata<T>)) {
+    pub fn add_task(&mut self, (to, vec): (usize, CsVecNodata<T>)) {
         if to == self.current_working_target {
             debug!("add_task: to == current_working_target, push the size to last task");
             self.tasks.last_mut().unwrap().1.push(vec);
@@ -214,7 +214,7 @@ where
     /// output: cycle: usize
     ///        merged tasks: Vec<(usize,usize)>
     /// return (add_cycles, merge_cycles, Vec<target_id,result_vec>)
-    fn build(self, merger_size: usize) -> (MergeCycle, Vec<(usize, CsVecNodata<T>)>) {
+    pub fn build(self, merger_size: usize) -> (MergeCycle, Vec<(usize, CsVecNodata<T>)>) {
         // TODO fix it! the size of the later task might be samller then simple add the nnzs
         debug!("starting to build the final cycles");
         let mut add_cycles = 0;
@@ -272,7 +272,7 @@ where
     }
 }
 
-fn internal_merge(
+pub fn internal_merge(
     input: &[PartialSum<usize>],
     merger_size: usize,
     output_elements: usize,
