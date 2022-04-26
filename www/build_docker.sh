@@ -1,2 +1,2 @@
 
-docker build -t jiangqiu/spmm_pim:1.4 .
+docker build -t jiangqiu/spmm_pim:1.5 .
