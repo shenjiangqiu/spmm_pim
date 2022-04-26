@@ -323,7 +323,7 @@ fn internal_merge(
 impl<N, IptrStorage, IndStorage, DataStorage, Iptr> Pim
     for CsMatBase<N, usize, IptrStorage, IndStorage, DataStorage, Iptr>
 where
-    N: Default + Copy + Clone + Debug,
+    N: Copy + Clone + Debug,
     Iptr: SpIndex,
     IptrStorage: Deref<Target = [Iptr]>,
     IndStorage: Deref<Target = [usize]>,

@@ -54,3 +54,23 @@ impl Settings {
         Ok(ret)
     }
 }
+
+impl MemSettings {
+    pub fn new(config: &[impl AsRef<Path>]) -> Result<Self> {
+        let names = config
+            .iter()
+            .map(AsRef::as_ref)
+            .map(File::from)
+            .collect_vec();
+        let ret = Config::builder()
+            .add_source(names)
+            .build()
+            .wrap_err("fail to build setting")?
+            .try_deserialize()
+            .wrap_err("fail to deserialize")?;
+
+        Ok(ret)
+    }
+
+
+}

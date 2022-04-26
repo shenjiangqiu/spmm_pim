@@ -41,8 +41,8 @@ fn main() -> Result<()> {
     let mut err_list = vec![];
     // load config into ConfigFile
     for i in mtxs.iter() {
-        run_1d_c_unroll!(i;full_result;ok_list;err_list; run_exp; 64,128,256,512,1024,2048);
-        run_2d_unroll!(i;full_result;ok_list;err_list; run_exp; (2,32),(4,16),(8,8),(2,64),(4,32),(8,16),(2,128),(4,64),(8,32),(16,16),(2,256),(4,128),(8,64),(16,32),
+        run_1d_c_unroll!(i;&settings.mem_settings;full_result;ok_list;err_list; run_exp; 64,128,256,512,1024,2048);
+        run_2d_unroll!(i;&settings.mem_settings; full_result;ok_list;err_list; run_exp; (2,32),(4,16),(8,8),(2,64),(4,32),(8,16),(2,128),(4,64),(8,32),(16,16),(2,256),(4,128),(8,64),(16,32),
         (2,512),(4,256),(8,128),(16,64),(32,32), (2,1024),(4,512),(8,256),(16,128),(32,64));
     }
     let file_name = settings.result_file;
