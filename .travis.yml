@@ -7,12 +7,11 @@ matrix:
   include:
     - os: linux
       rust: stable
-d6da8825-01f5-4bbc-9ee9-eac677e6fc4c
+
 script:
     - rustup component add llvm-tools-preview
     - export RUSTFLAGS="-Cinstrument-coverage"
-    - export Token="d6da8825-01f5-4bbc-9ee9-eac677e6fc4c"
     - cargo build --verbose
     - LLVM_PROFILE_FILE="your_name-%p-%m.profraw" cargo test --verbose
     - ./grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
-    - bash <(curl -s https://codecov.io/bash) -f lcov.info -t $Token
+    - bash <(curl -s https://codecov.io/bash) -f lcov.info -t "d6da8825-01f5-4bbc-9ee9-eac677e6fc4c"
