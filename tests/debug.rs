@@ -8,7 +8,6 @@ use spmm_pim::{result::Results, settings::Settings};
 use sprs::CsMat;
 use std::path::{Path, PathBuf};
 
-#[test]
 fn test() -> Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("debug"))
         .try_init()
