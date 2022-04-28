@@ -1,9 +1,10 @@
+use std::env::args_os;
 use std::io;
 
 use clap::{Command, IntoApp, Parser};
 use clap_complete::Generator;
 use eyre::{Context, Result};
-use log::{debug, info, error};
+use log::{debug, error, info};
 use spmm_pim::result::save_result_list;
 use spmm_pim::run::run_exp_csr;
 use spmm_pim::utils::init_log;
@@ -13,10 +14,16 @@ use spmm_pim::{run_1d_c_unroll_buf, run_2d_unroll_buf};
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     clap_complete::generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
+
 fn main() -> Result<()> {
+    let args = args_os();
+    let args = Args::parse_from(args);
+    _main(args)
+}
+
+fn _main(args: Args) -> Result<()> {
     let start_time = std::time::Instant::now();
     init_log("info");
-    let args = Args::parse();
 
     if let Some(generator) = args.generator {
         let mut cmd = Args::command();
@@ -68,4 +75,18 @@ fn main() -> Result<()> {
     info!("the list of files succeeded: {:?}", ok_list);
     info!("the list of files failed: {:?}", err_list);
     Ok(())
+}
+
+#[cfg(test)]
+mod test_main {
+
+    use clap::StructOpt;
+    use spmm_pim::args::Args;
+
+    #[test]
+    fn test_main() {
+        let args = vec!["spmm_pim", "configs/default.toml", "configs/ddr4.toml"];
+        let args = Args::parse_from(args);
+        super::_main(args).unwrap();
+    }
 }
