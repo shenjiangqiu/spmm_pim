@@ -9,3 +9,5 @@ chip_merger_size = 8
 channel_merger_size = 8
 dimm_merger_size = 8
 simd_width = 8
+parallel_count=8
+reorder_count=8

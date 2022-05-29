@@ -171,12 +171,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::init_log;
     use eyre::Result;
     use sprs::{CsMat, TriMat};
     #[test]
     fn test_bsr() {
-        init_log("debug");
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<2, 2, _> = Bsr::from(csr);
@@ -199,7 +197,6 @@ mod test {
 
     #[test]
     fn test_unalign() {
-        init_log("debug");
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx").unwrap();
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<4, 4, _> = Bsr::from(csr);
@@ -245,7 +242,6 @@ mod test {
 
     #[test]
     fn test_bsr_to_csr() -> Result<()> {
-        init_log("debug");
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?;
         let csr: CsMat<_> = matrix.to_csr();
         let bsr: Bsr<1, 16, _> = Bsr::from(csr);

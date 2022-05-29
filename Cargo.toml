@@ -1,25 +1,32 @@
 [package]
+edition = "2021"
 name = "spmm_pim"
 version = "0.1.0"
-edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-crate-type = ["cdylib","rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-sprs = "0.11.0"
-itertools = "0.10"
-log = "0.4.16"
-env_logger="0.9.0"
-serde_json="1.0.79"
-serde = { version = "1.0", features = ["derive"] }
-clap = { version = "3.1.10", features = ["derive"] }
-config = "0.13.1"
-eyre = "0.6.8"
-toml = "0.5.9"
+async-trait = "0.1.53"
+clap = {version = "3.1.10", features = ["derive"]}
 clap_complete = "3.1.2"
+config = "0.13.1"
+desim = {path = "../desim"}
+enum-as-inner = "0.5.0"
+eyre = "0.6.8"
+itertools = "0.10"
+lazy_static = "1.4.0"
+log = "0.4.16"
+log4rs = "1.1.1"
+plotlib = "0.5.1"
+reqwest = {version = "0.11.10", features = ["blocking"]}
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0.79"
+serde_yaml = "0.8.24"
+sprs = "0.11.0"
+tokio = {version = "1.18.2", features = ["full"]}
+toml = "0.5.9"
 wasm-bindgen = "0.2.80"
-reqwest = { version = "0.11.10", features = ["blocking"] }
 wasm-bindgen-futures = "0.4.30"
-wasm-bindgen-test= "0.3.30"
+wasm-bindgen-test = "0.3.30"

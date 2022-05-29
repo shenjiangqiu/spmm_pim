@@ -1,6 +1,8 @@
 use std::{fmt::Debug, mem};
 
+use itertools::Itertools;
 use log::debug;
+use plotlib::{repr::Histogram, view::View};
 use sprs::{CsMat, SpIndex};
 
 use crate::{
@@ -32,7 +34,9 @@ where
         let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
 
         // fisrt calculate the access row stream of each bank
-        let num_rows = self.a.rows();
+        // the rows of the second vector.
+        let num_rows = self.a.cols();
+        assert_eq!(num_rows, self.b.rows());
         // contains the rows to read for each bank
         let mut row_stream = vec![vec![]; num_banks];
         // return the bank id and the row id in bank
@@ -40,7 +44,6 @@ where
         for i in self.a.iter() {
             debug!("i: {:?}", i);
             let row_select = i.1 .1.index();
-
             let bank_id = pim::get_bank_id_from_row_id(row_select, mem_settings, num_rows);
             debug!("bank_id: {:?}", bank_id);
             let row_id_in_bank = pim::get_row_id_in_bank(row_select, mem_settings, num_rows);
@@ -55,6 +58,7 @@ where
                 debug!("band_id: {:?} need read {:?}", bank_id, row_id_in_bank + i);
             }
         }
+
         debug!("finished build the stream, next count the rows for different banks");
         debug!("{:?}", row_stream);
         let result = row_stream
@@ -73,7 +77,10 @@ where
         debug!("{:?}", result);
         result
     }
-    // return how many merge operations are needed
+    /// return how many merge operations are needed
+    /// return:
+    /// - Vec<MergeCycle>: the merge cycles for each bank
+    /// - Vec<PartialSum<usize>>: the partial sums for each bank
     fn bank_merge(&self, mem_settings: &MemSettings) -> (Vec<MergeCycle>, Vec<PartialSum<usize>>) {
         let merger_size = mem_settings.bank_merger_size;
         let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
@@ -84,7 +91,7 @@ where
             debug!("row_select: {:?}", row_select);
             let target_row = i.1 .0.index();
             debug!("target_row: {:?}", target_row);
-            let bank_id = pim::get_bank_id_from_row_id(row_select, mem_settings, self.a.rows());
+            let bank_id = pim::get_bank_id_from_row_id(row_select, mem_settings, self.a.cols());
             debug!("bank_id: {:?}", bank_id);
             let row_nnz = self.b.outer_view(row_select).unwrap().nnz();
             debug!("row_nnz: {:?}", row_nnz);

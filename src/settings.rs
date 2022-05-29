@@ -13,7 +13,12 @@ pub enum RowMapping {
     Chunk,
     Interleaved,
 }
-#[derive(Deserialize, Debug)]
+impl Default for RowMapping {
+    fn default() -> Self {
+        RowMapping::Chunk
+    }
+}
+#[derive(Deserialize, Debug, Default)]
 pub struct MemSettings {
     pub row_size: usize,
     pub banks: usize,
@@ -29,6 +34,10 @@ pub struct MemSettings {
 
     // the simd width(for bsr)
     pub simd_width: usize,
+
+    // the reorder engine
+    pub parallel_count: usize,
+    pub reorder_count: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {
@@ -71,6 +80,4 @@ impl MemSettings {
 
         Ok(ret)
     }
-
-
 }

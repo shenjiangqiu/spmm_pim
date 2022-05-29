@@ -7,7 +7,6 @@ use eyre::{Context, Result};
 use log::{debug, error, info};
 use spmm_pim::result::save_result_list;
 use spmm_pim::run::run_exp_csr;
-use spmm_pim::utils::init_log;
 use spmm_pim::{args::Args, result::Results, settings::Settings};
 use spmm_pim::{run_1d_c_unroll_buf, run_2d_unroll_buf};
 
@@ -22,9 +21,11 @@ fn main() -> Result<()> {
 }
 
 fn _main(args: Args) -> Result<()> {
-    let start_time = std::time::Instant::now();
-    init_log("info");
+    let config_str = include_str!("../log_config.yml");
+    let config = serde_yaml::from_str(config_str).unwrap();
+    log4rs::init_raw_config(config).unwrap();
 
+    let start_time = std::time::Instant::now();
     if let Some(generator) = args.generator {
         let mut cmd = Args::command();
         eprintln!("Generating completion file for {:?}...", generator);
@@ -39,6 +40,8 @@ fn _main(args: Args) -> Result<()> {
         config_files.push("configs/ddr4.toml".into());
     }
 
+    println!("config");
+
     let settings = Settings::new(&config_files).wrap_err("fail to create Setting object")?;
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files.clone();
@@ -51,9 +54,10 @@ fn _main(args: Args) -> Result<()> {
         match sprs::io::read_matrix_market(i) {
             Ok(tri) => {
                 let csr = tri.to_csr();
-                run_1d_c_unroll_buf!(i;&csr;&settings.mem_settings;full_result;ok_list;err_list; run_exp_csr; 64,128,256,512,1024,2048);
-                run_2d_unroll_buf!(i;&csr;&settings.mem_settings; full_result;ok_list;err_list; run_exp_csr; (2,32),(4,16),(8,8),(2,64),(4,32),(8,16),(2,128),(4,64),(8,32),(16,16),(2,256),(4,128),(8,64),(16,32),
-                (2,512),(4,256),(8,128),(16,64),(32,32), (2,1024),(4,512),(8,256),(16,128),(32,64));
+                // run_1d_c_unroll_buf!(i;&csr;&settings.mem_settings;full_result;ok_list;err_list; run_exp_csr; 64,128,256,512,1024,2048);
+                // run_2d_unroll_buf!(i;&csr;&settings.mem_settings; full_result;ok_list;err_list; run_exp_csr; (2,32),(4,16),(8,8),(2,64),(4,32),(8,16),(2,128),(4,64),(8,32),(16,16),(2,256),(4,128),(8,64),(16,32),
+                // (2,512),(4,256),(8,128),(16,64),(32,32), (2,1024),(4,512),(8,256),(16,128),(32,64));
+                run_2d_unroll_buf!(i;&csr;&settings.mem_settings; full_result;ok_list;err_list; run_exp_csr;(1,1),(4,4));
             }
             Err(e) => {
                 err_list.push(i);
@@ -87,6 +91,7 @@ mod test_main {
     fn test_main() {
         let args = vec!["spmm_pim", "configs/default.toml", "configs/ddr4.toml"];
         let args = Args::parse_from(args);
+        println!("hello world!");
         super::_main(args).unwrap();
     }
 }
