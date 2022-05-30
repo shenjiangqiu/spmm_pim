@@ -12,7 +12,7 @@ async-trait = "0.1.53"
 clap = {version = "3.1.10", features = ["derive"]}
 clap_complete = "3.1.2"
 config = "0.13.1"
-desim = {path = "../desim"}
+desim = { git = "https://github.com/shenjiangqiu/desim"}
 enum-as-inner = "0.5.0"
 eyre = "0.6.8"
 itertools = "0.10"
