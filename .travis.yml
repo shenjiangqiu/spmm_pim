@@ -8,7 +8,7 @@ before_install:
 matrix:
   include:
     - os: linux
-      rust: stable
+      rust: nightly
 
 script:
     - rustup component add llvm-tools-preview
