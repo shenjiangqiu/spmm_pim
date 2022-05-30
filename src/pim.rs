@@ -1,10 +1,10 @@
 //! the pim module
 
-use std::{collections::BTreeMap, fmt::Debug, mem, ops::Deref};
+use std::{collections::BTreeMap, fmt::Debug, ops::Deref};
 
 use itertools::Itertools;
 use log::debug;
-use sprs::{CsMatBase, SpIndex};
+use sprs::{SpIndex};
 
 use crate::{csv_nodata::CsVecNodata, settings::MemSettings};
 /// Partial sum
@@ -180,6 +180,7 @@ pub fn merge_rows_into_one(
     tasks: Vec<CsVecNodata<usize>>,
     merger_size: usize,
 ) -> (usize, usize, CsVecNodata<usize>) {
+    let mut tasks = tasks;
     let mut merge_cycles = 0usize;
     let mut add_cycles = 0usize;
     while tasks.len() > 1 {

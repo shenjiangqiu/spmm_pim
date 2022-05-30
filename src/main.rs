@@ -8,7 +8,7 @@ use log::{debug, error, info};
 use spmm_pim::result::save_result_list;
 use spmm_pim::run::run_exp_csr;
 use spmm_pim::{args::Args, result::Results, settings::Settings};
-use spmm_pim::{run_1d_c_unroll_buf, run_2d_unroll_buf};
+use spmm_pim::{run_2d_unroll_buf};
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     clap_complete::generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());

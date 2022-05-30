@@ -1,8 +1,7 @@
 use std::{fmt::Debug, mem};
 
-use itertools::Itertools;
 use log::debug;
-use plotlib::{repr::Histogram, view::View};
+
 use sprs::{CsMat, SpIndex};
 
 use crate::{

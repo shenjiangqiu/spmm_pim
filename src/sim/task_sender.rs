@@ -1,7 +1,6 @@
 use desim::ResourceId;
 
-
-use super::{component::Component, BankTaskType, SpmmStatusEnum};
+use super::{component::Component};
 
 pub struct TaskSender {
     pub matrix: Vec<(usize, usize)>,
@@ -10,14 +9,7 @@ pub struct TaskSender {
 }
 impl Component for TaskSender {
     fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |_| {
-            for (from, to) in self.matrix {
-                // build the task
-                let task = BankTaskType { from, to };
-                
-                yield SpmmStatusEnum::PushBankTask(self.task_sender, task).into();
-            }
-        })
+        todo!()
     }
 }
 pub struct TaskSenderConfig {}

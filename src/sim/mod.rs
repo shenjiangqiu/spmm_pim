@@ -6,15 +6,14 @@ pub mod task_router;
 pub mod task_sender;
 use desim::prelude::*;
 use enum_as_inner::EnumAsInner;
-use lazy_static::lazy_static;
-use std::{collections::BTreeMap, ops::Generator, sync::RwLock};
+use std::{cell::RefCell, collections::BTreeMap, ops::Generator};
 
-lazy_static! {
-    pub static ref PE_MAPPING: RwLock<BTreeMap::<PeID, usize>> =
-        RwLock::new(BTreeMap::<PeID, usize>::new());
+thread_local! {
+    pub static  PE_MAPPING: RefCell<BTreeMap::<PeID, usize>> =
+        RefCell::new(BTreeMap::<PeID, usize>::new());
 }
 
-use crate::{csv_nodata::CsVecNodata, pim::PartialSum};
+use crate::{csv_nodata::CsVecNodata};
 #[derive(Debug, Clone, Default)]
 pub struct BankTask {
     pub from: usize,
@@ -29,7 +28,7 @@ pub type BankID = (ChipID, usize);
 pub type PeID = (BankID, usize);
 
 pub type SpmmContex = SimContext<SpmmStatus>;
-pub type SpmmGenerator = dyn Generator<SpmmContex, Yield = SpmmStatus, Return = ()>;
+pub type SpmmGenerator = dyn Generator<SpmmContex, Yield = SpmmStatus, Return = ()> + Unpin;
 //todo: add the type
 pub type BankTaskType = BankTask;
 pub type PartialResultTaskType = CsVecNodata<usize>;
@@ -52,8 +51,6 @@ pub struct SpmmStatus {
     state: SpmmStatusEnum,
 
     // bank pe to task mapping:
-    bank_mappings: Vec<BankTaskMapping>,
-
     enable_log: bool,
 }
 
@@ -62,7 +59,6 @@ impl From<SpmmStatusEnum> for SpmmStatus {
         Self {
             state,
             enable_log: false,
-            ..Default::default()
         }
     }
 }
@@ -71,7 +67,6 @@ impl SpmmStatus {
         Self {
             state,
             enable_log: false,
-            ..Default::default()
         }
     }
 
@@ -79,14 +74,13 @@ impl SpmmStatus {
         Self {
             state,
             enable_log: true,
-            ..Default::default()
         }
     }
     pub fn state(&self) -> &SpmmStatusEnum {
         &self.state
     }
-    pub fn into_inner(self) -> (bool, SpmmStatusEnum, Vec<BankTaskMapping>) {
-        (self.enable_log, self.state, self.bank_mappings)
+    pub fn into_inner(self) -> (bool, SpmmStatusEnum) {
+        (self.enable_log, self.state)
     }
 }
 
@@ -94,7 +88,7 @@ impl Default for SpmmStatus {
     fn default() -> Self {
         Self {
             enable_log: false,
-            ..Default::default()
+            state: Default::default(),
         }
     }
 }
@@ -111,8 +105,8 @@ impl SimState for SpmmStatus {
         }
     }
 
-    fn set_effect(&mut self, effect: Effect) {
-        todo!()
+    fn set_effect(&mut self, _: Effect) {
+        panic!("set_effect is not supported");
     }
 
     fn should_log(&self) -> bool {

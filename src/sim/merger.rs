@@ -1,9 +1,9 @@
 use desim::ResourceId;
 
-use crate::pim::PartialSum;
+
 
 use super::{
-    component::Component, BankTaskType, PartialResultTaskType, SpmmContex, SpmmStatusEnum,
+    component::Component, PartialResultTaskType, SpmmContex, SpmmStatusEnum,
 };
 
 pub struct Merger {
@@ -12,7 +12,7 @@ pub struct Merger {
 }
 
 impl Merger {
-    fn process_task(&self, task: PartialResultTaskType) -> (f64, PartialResultTaskType) {
+    fn process_task(&self, _task: PartialResultTaskType) -> (f64, PartialResultTaskType) {
         todo!();
     }
 }

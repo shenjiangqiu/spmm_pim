@@ -1,4 +1,4 @@
-use std::{io::BufReader, path::Path};
+use std::path::Path;
 
 use crate::{
     bsr::Bsr, pim::Pim, result::SingleResult, settings::MemSettings, two_matrix::TwoMatrix,
@@ -6,7 +6,7 @@ use crate::{
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
-use sprs::{CsMat, TriMat};
+use sprs::{CsMat};
 /// run the matrix csr x csr_transpose
 pub fn run_exp_csr<'a, const R: usize, const C: usize>(
     path: &'a Path,
@@ -318,12 +318,12 @@ macro_rules! run_2d_unroll_buf {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
+    // use std::path::PathBuf;
 
-    use log::debug;
+    // use log::debug;
 
-    use crate::result::Results;
-    use crate::settings::MemSettings;
+    // use crate::result::Results;
+    // use crate::settings::MemSettings;
     // #[test]
     // fn test() {
     //     let path = PathBuf::from("test.mtx");
