@@ -32,16 +32,7 @@ impl Component for Merger {
         Box::new(move |_: SpmmContex| {
             // first get the task
             loop {
-                let task: SpmmContex = yield SpmmStatusEnum::Pop(self.task_in).into();
-                let (_, status) = task.into_inner();
-                let (_, task) = status.into_inner();
-                let task=task.into_push_partial_task().unwrap().1;
-                // process
-                let (process_time, partial_out) = self.process_task(task);
-                
-                yield SpmmStatusEnum::Wait(process_time).into();
-                // push the partial result back
-                yield SpmmStatusEnum::PushPartialTask(self.partial_out, partial_out).into();
+                // step 1: get the finished 
             }
         })
     }
