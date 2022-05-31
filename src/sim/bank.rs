@@ -173,14 +173,21 @@ impl BankTaskReorder {
 }
 #[cfg(test)]
 mod test {
-    use desim::{resources::Store, Simulation};
+    use desim::{resources::Store, EndCondition, Simulation};
 
     use super::*;
     #[test]
     fn test_bank() {
         let mut simulator = Simulation::new();
         let task_in = simulator.create_resource(Box::new(Store::new(1)));
-        let task_pe = vec![4; simulator.create_resource(Box::new(Store::new(1)))];
+        let task_pe = {
+            let mut task_pe = vec![];
+            for _i in 0..4 {
+                let task_out = simulator.create_resource(Box::new(Store::new(1)));
+                task_pe.push(task_out);
+            }
+            task_pe
+        };
         let partial_return = simulator.create_resource(Box::new(Store::new(1)));
         let bank_task_reorder = BankTaskReorder::new(task_in, task_pe.clone(), 5, 4, ((0, 0), 0));
         let bank_pes = {
@@ -192,8 +199,12 @@ mod test {
             pes
         };
         let bank_task_reorder = simulator.create_process(bank_task_reorder.run());
+        simulator.schedule_event(0.0, bank_task_reorder, SpmmStatusEnum::Continue.into());
         for pe in bank_pes {
             let pe_process = simulator.create_process(pe.run());
+            simulator.schedule_event(0.0, pe_process, SpmmStatusEnum::Continue.into());
         }
+
+        simulator.run(EndCondition::NoEvents);
     }
 }
