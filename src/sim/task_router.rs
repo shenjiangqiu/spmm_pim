@@ -1,6 +1,6 @@
 use desim::ResourceId;
 
-use super::{component::Component, SpmmGenerator, SpmmStatusEnum};
+use super::{component::Component, SpmmContex, SpmmGenerator, SpmmStatusEnum};
 
 pub struct TaskRouterConfig {}
 
@@ -25,10 +25,10 @@ impl TaskRouter {
 
 impl Component for TaskRouter {
     fn run(self) -> Box<SpmmGenerator> {
-        Box::new(move |_| {
-            yield SpmmStatusEnum::Continue.into();
-            
+        Box::new(move |context: SpmmContex| {
+            let (_time, status) = context.into_inner();
 
+            yield status.clone_with_state(SpmmStatusEnum::Continue);
         })
     }
 }

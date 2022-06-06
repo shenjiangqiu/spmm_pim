@@ -28,17 +28,18 @@ impl TaskReorderer {
 
 impl Component for TaskReorderer {
     fn run(self) -> Box<SpmmGenerator> {
-        Box::new(move |_| {
-            yield SpmmStatusEnum::Continue.into();
+        Box::new(move |context: SpmmContex| {
+            let (_time, status) = context.into_inner();
             loop {
-                let task: SpmmContex = yield SpmmStatusEnum::Pop(self.task_in).into();
+                let task: SpmmContex =
+                    yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (_time, state) = task.into_inner();
-                let (_, state) = state.into_inner();
+                let (_, state, _, _) = state.into_inner();
                 let task = state.into_push_bank_task().unwrap().1;
                 // do some reorder work
-                
+
                 // finished, push the task
-                yield SpmmStatusEnum::PushBankTask(self.task_out, task).into();
+                yield status.clone_with_state(SpmmStatusEnum::PushBankTask(self.task_out, task));
             }
         })
     }

@@ -32,6 +32,12 @@ pub struct MemSettings {
     pub channel_merger_size: usize,
     pub dimm_merger_size: usize,
 
+    // the merger
+    pub bank_merger_count: usize,
+    pub chip_merger_count: usize,
+    pub channel_merger_count: usize,
+    pub dimm_merger_count: usize,
+
     // the simd width(for bsr)
     pub simd_width: usize,
 

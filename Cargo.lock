@@ -337,7 +337,6 @@ dependencies = [
 [[package]]
 name = "desim"
 version = "0.3.0"
-source = "git+https://github.com/shenjiangqiu/desim#05c68d2608b33f2bd4120ceffc467d8f32b6ab13"
 
 [[package]]
 name = "digest"

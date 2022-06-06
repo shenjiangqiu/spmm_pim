@@ -1,28 +1,25 @@
 use desim::ResourceId;
+use sprs::CsMat;
 
-use super::{component::Component};
+use super::component::Component;
 
-pub struct TaskSender {
-    pub matrix: Vec<(usize, usize)>,
-    pub config: TaskSenderConfig,
+pub struct TaskSender<'a> {
+    pub matrix: &'a CsMat<usize>,
     pub task_sender: ResourceId,
 }
-impl Component for TaskSender {
+impl<'a> Component for TaskSender<'a> {
     fn run(self) -> Box<super::SpmmGenerator> {
         todo!()
     }
 }
-pub struct TaskSenderConfig {}
 
-impl TaskSender {
+impl<'a> TaskSender<'a> {
     pub fn new(
-        matrix: Vec<(usize, usize)>,
-        task_sender_config: TaskSenderConfig,
+        matrix: &'a CsMat<usize>,
         task_sender: ResourceId,
     ) -> Self {
         Self {
             matrix,
-            config: task_sender_config,
             task_sender,
         }
     }

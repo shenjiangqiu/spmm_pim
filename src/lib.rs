@@ -5,14 +5,14 @@ pub mod bsr;
 pub mod bsr_row_builder;
 pub mod csv_nodata;
 pub mod pim;
+pub mod reorder_calculator;
+pub mod reorder_system;
 pub mod result;
 pub mod run;
 pub mod settings;
+pub mod sim;
 pub mod two_matrix;
 pub mod utils;
-pub mod sim;
-pub mod reorder_system;
-pub mod reorder_calculator;
 
 use std::{io::BufReader, path::Path};
 
@@ -33,7 +33,6 @@ struct CombinedResult<'a> {
 }
 #[wasm_bindgen]
 pub async fn run1(name: String) -> Result<String, JsValue> {
-
     let res = reqwest::get(format!("https://research.thesjq.com/files/{}", name))
         .await
         .map_err(JsError::from)?
@@ -62,6 +61,10 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         simd_width: 128,
         parallel_count: 8,
         reorder_count: 8,
+        bank_merger_count: 8,
+        chip_merger_count: 8,
+        channel_merger_count: 8,
+        dimm_merger_count: 8,
     };
     let csr: CsMat<_> = tri.to_csr();
 
@@ -88,10 +91,8 @@ mod test {
     use sprs::{CsMat, TriMat};
     use wasm_bindgen_test::wasm_bindgen_test;
 
-
     #[test]
     fn test_csc() -> Result<()> {
-        
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?;
         let csc: CsMat<_> = matrix.to_csc();
         debug!("{:?}", csc);
@@ -100,7 +101,6 @@ mod test {
 
     #[test]
     fn test_csr() -> Result<()> {
-        
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?;
         let csr: CsMat<_> = matrix.to_csr();
         debug!("{:?}", csr);
@@ -109,7 +109,6 @@ mod test {
 
     #[test]
     fn test_bsr() -> Result<()> {
-        
         let matrix: TriMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?;
         let bsr: super::bsr::Bsr<2, 2, _> = super::bsr::Bsr::from(matrix.to_csr());
         debug!("{:?}", bsr);
