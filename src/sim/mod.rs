@@ -434,6 +434,7 @@ impl Simulator {
                                         mem_settings.bank_merger_size,
                                         10,
                                         10,
+                                        store_id,
                                     );
                                     let id = sim.create_process(bank_pe.run());
                                     sim.schedule_event(0., id, status.clone());

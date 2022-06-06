@@ -15,6 +15,9 @@ pub struct BankPe {
     // resources
     pub task_in: ResourceId,
     pub partial_out: ResourceId,
+
+    // just for record
+    pub task_sender_input_id: ResourceId,
 }
 
 impl BankPe {
@@ -24,6 +27,8 @@ impl BankPe {
         merger_size: usize,
         adder_size: usize,
         total_rows: usize,
+
+        task_sender_input_id: ResourceId,
     ) -> Self {
         Self {
             task_in,
@@ -31,6 +36,7 @@ impl BankPe {
             merger_size,
             adder_size,
             total_rows,
+            task_sender_input_id,
         }
     }
 }
@@ -77,7 +83,7 @@ impl Component for BankPe {
                                 as f64));
                             yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                                 self.partial_out,
-                                (current_task, self.task_in, data),
+                                (current_task, self.task_sender_input_id, data),
                             ));
                         }
 
@@ -181,7 +187,7 @@ mod test {
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let pe_comp = BankPe::new(pe_in, partial_return, 4, 3, 4);
+                let pe_comp = BankPe::new(pe_in, partial_return, 4, 3, 4, task_in);
                 pes.push(pe_comp);
             }
             pes
