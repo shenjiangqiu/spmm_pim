@@ -11,7 +11,6 @@ pub struct BankPe {
     // settings
     pub merger_size: usize,
     pub adder_size: usize,
-    pub total_rows: usize,
     // resources
     pub task_in: ResourceId,
     pub partial_out: ResourceId,
@@ -26,7 +25,6 @@ impl BankPe {
         partial_out: ResourceId,
         merger_size: usize,
         adder_size: usize,
-        total_rows: usize,
 
         task_sender_input_id: ResourceId,
     ) -> Self {
@@ -35,7 +33,6 @@ impl BankPe {
             partial_out,
             merger_size,
             adder_size,
-            total_rows,
             task_sender_input_id,
         }
     }
@@ -99,7 +96,6 @@ impl Component for BankPe {
 pub struct BankTaskReorder {
     pub task_in: ResourceId,
     pub task_out: Vec<ResourceId>,
-    pub num_rows: usize,
 
     pub total_reorder_size: usize,
     pub self_id: BankID,
@@ -148,14 +144,12 @@ impl BankTaskReorder {
     pub fn new(
         task_in: ResourceId,
         task_out: Vec<ResourceId>,
-        num_rows: usize,
         total_reorder_size: usize,
         self_id: BankID,
     ) -> Self {
         Self {
             task_in,
             task_out,
-            num_rows,
             total_reorder_size,
             self_id,
         }
@@ -183,11 +177,11 @@ mod test {
             task_pe
         };
         let partial_return = simulator.create_resource(Box::new(Store::new(1)));
-        let bank_task_reorder = BankTaskReorder::new(task_in, task_pe.clone(), 5, 4, ((0, 0), 0));
+        let bank_task_reorder = BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0));
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let pe_comp = BankPe::new(pe_in, partial_return, 4, 3, 4, task_in);
+                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in);
                 pes.push(pe_comp);
             }
             pes

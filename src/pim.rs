@@ -4,9 +4,12 @@ use std::{collections::BTreeMap, fmt::Debug, ops::Deref};
 
 use itertools::Itertools;
 use log::debug;
-use sprs::{SpIndex};
+use sprs::SpIndex;
 
-use crate::{csv_nodata::CsVecNodata, settings::MemSettings};
+use crate::{
+    csv_nodata::CsVecNodata,
+    settings::{MemSettings, RowMapping},
+};
 /// Partial sum
 /// for each element in `data`
 /// it contains the `(target_index, target_row_size)`
@@ -126,11 +129,14 @@ pub trait Pim {
 
 pub fn get_bank_id_from_row_id(
     row_id: usize,
-    mem_settings: &MemSettings,
+    channels: usize,
+    chips: usize,
+    banks: usize,
     num_rows: usize,
+    row_mapping: &RowMapping,
 ) -> usize {
-    let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
-    match mem_settings.row_mapping {
+    let num_banks = banks * chips * channels;
+    match row_mapping {
         crate::settings::RowMapping::Chunk => {
             let rows_per_bank = num_rows / num_banks;
 

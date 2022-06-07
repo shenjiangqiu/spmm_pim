@@ -11,9 +11,6 @@ pub struct DimmMerger {
     pub merger_resouce: ResourceId,
 
     // settings
-    pub merger_size: usize,
-
-    pub parallel_merger_num: usize,
     pub merger_status_id: usize,
 }
 
@@ -22,16 +19,12 @@ impl DimmMerger {
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
         merger_resouce: ResourceId,
-        merger_size: usize,
-        parallel_merger_num: usize,
         merger_status_id: usize,
     ) -> Self {
         Self {
             task_in,
             lower_pes,
             merger_resouce,
-            merger_size,
-            parallel_merger_num,
             merger_status_id,
         }
     }

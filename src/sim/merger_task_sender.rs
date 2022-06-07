@@ -1,6 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
-};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use desim::{ResourceId, SimContext};
 use itertools::Itertools;

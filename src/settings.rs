@@ -8,7 +8,7 @@ use eyre::Result;
 use itertools::Itertools;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub enum RowMapping {
     Chunk,
     Interleaved,
@@ -44,6 +44,12 @@ pub struct MemSettings {
     // the reorder engine
     pub parallel_count: usize,
     pub reorder_count: usize,
+
+    // mem read latency
+    pub row_change_latency: usize,
+
+    // add size
+    pub bank_adder_size: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

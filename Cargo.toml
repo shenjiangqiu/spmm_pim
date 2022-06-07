@@ -8,15 +8,13 @@ version = "0.1.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-async-trait = "0.1.53"
-clap = {version = "3.1.10", features = ["derive"]}
+clap = {version = "3.1.18", features = ["derive"]}
 clap_complete = "3.1.2"
 config = "0.13.1"
-desim = {path="../desim"}
+desim = {git = "https://github.com/shenjiangqiu/desim.git"}
 enum-as-inner = "0.5.0"
 eyre = "0.6.8"
 itertools = "0.10"
-lazy_static = "1.4.0"
 log = "0.4.16"
 log4rs = "1.1.1"
 plotlib = "0.5.1"
@@ -25,7 +23,6 @@ serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0.79"
 serde_yaml = "0.8.24"
 sprs = "0.11.0"
-tokio = {version = "1.18.2", features = ["full"]}
 toml = "0.5.9"
 wasm-bindgen = "0.2.80"
 wasm-bindgen-futures = "0.4.30"

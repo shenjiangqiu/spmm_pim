@@ -4,23 +4,24 @@ pub mod chip_merger;
 pub mod component;
 pub mod dimm_merger;
 pub mod final_receiver;
+pub mod id_translation;
 pub mod merger_task_dispather;
 pub mod merger_task_sender;
 pub mod merger_task_worker;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
-
 use desim::{
     prelude::*,
     resources::{CopyDefault, SimpleResource, Store},
 };
 use enum_as_inner::EnumAsInner;
+use id_translation::*;
 use itertools::Itertools;
 use std::{cell::RefCell, collections::BTreeMap, ops::Generator, rc::Rc};
 
 use crate::{csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix};
-
+const STORE_SIZE: usize = 4;
 use self::{
     bank::{BankPe, BankTaskReorder},
     channel_merger::ChannelMerger,
@@ -39,36 +40,6 @@ pub struct BankTask {
     pub to: usize,
     pub row: CsVecNodata<usize>,
     pub bank_id: BankID,
-}
-
-pub type ChannelID = usize;
-pub type ChipID = (ChannelID, usize);
-
-pub type BankID = (ChipID, usize);
-pub type PeID = (BankID, usize);
-
-pub fn channel_id_from_chip_id(chip_id: &ChipID) -> &ChannelID {
-    &chip_id.0
-}
-
-pub fn chip_id_from_bank_id(bank_id: &BankID) -> &ChipID {
-    &bank_id.0
-}
-
-pub fn channel_id_from_bank_id(bank_id: &BankID) -> &ChannelID {
-    channel_id_from_chip_id(chip_id_from_bank_id(bank_id))
-}
-
-pub fn bank_id_from_pe_id(pe_id: &PeID) -> &BankID {
-    &pe_id.0
-}
-
-pub fn chip_id_from_pe_id(pe_id: &PeID) -> &ChipID {
-    chip_id_from_bank_id(bank_id_from_pe_id(pe_id))
-}
-
-pub fn channel_id_from_pe_id(pe_id: &PeID) -> &ChannelID {
-    channel_id_from_chip_id(chip_id_from_pe_id(pe_id))
 }
 
 pub type SpmmContex = SimContext<SpmmStatus>;
@@ -228,7 +199,7 @@ enum SimulationResult {
 }
 pub struct Simulator {}
 impl Simulator {
-    pub fn run(mem_settings: &MemSettings, tow_matrix: &TwoMatrix<usize, usize>) {
+    pub fn run(mem_settings: &MemSettings, input_matrix: TwoMatrix<i32, i32>) {
         // the basic data
         let mut sim = Simulation::new();
         let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
@@ -241,7 +212,7 @@ impl Simulator {
 
         // 1. add the task sender and final reciever
 
-        let final_receiver_resouce = sim.create_resource(Box::new(Store::new(1)));
+        let final_receiver_resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
         let final_rev = FinalReceiver {
             receiver: final_receiver_resouce,
         };
@@ -249,24 +220,34 @@ impl Simulator {
         sim.schedule_event(0., id, status.clone());
 
         // this store connect the task sender and the Dimm
-        let task_send_store = sim.create_resource(Box::new(Store::new(1)));
-        let task_sender = TaskSender::new(&tow_matrix.a, task_send_store);
+        let task_send_store = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
+        let task_sender = TaskSender::new(
+            input_matrix.a,
+            input_matrix.b,
+            task_send_store,
+            mem_settings.channels,
+            mem_settings.chips,
+            mem_settings.banks,
+            mem_settings.row_mapping.clone(),
+        );
         let id = sim.create_process(task_sender.run());
         sim.schedule_event(0., id, status.clone());
 
         // 2. add the Dimm
         let num_channels = mem_settings.channels;
         let channel_stores = (0..num_channels)
-            .map(|_i| sim.create_resource(Box::new(Store::new(1))))
+            .map(|_i| sim.create_resource(Box::new(Store::new(STORE_SIZE))))
             .collect_vec();
-        let merger_status_id = merger_status.borrow_mut().create_merger_status(10);
-        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(10)));
+        let merger_status_id = merger_status
+            .borrow_mut()
+            .create_merger_status(mem_settings.dimm_merger_count);
+        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
+            mem_settings.dimm_merger_count,
+        )));
         let dimm = DimmMerger::new(
             task_send_store,
             channel_stores.clone(),
             merger_resouce_id,
-            10,
-            10,
             merger_status_id,
         );
         let id = sim.create_process(dimm.run());
@@ -275,7 +256,7 @@ impl Simulator {
         // create the merger_task_worker
         let mut task_receiver = vec![];
         for _i in 0..mem_settings.dimm_merger_count {
-            let resouce = sim.create_resource(Box::new(Store::new(1)));
+            let resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
             let merger_task_worker = MergerWorker {
                 merger_size: mem_settings.dimm_merger_size,
                 merger_status_id,
@@ -289,7 +270,7 @@ impl Simulator {
             task_receiver.push(resouce);
         }
         // create the dimm merger_task_dispatcher
-        let dimm_merger_worker_task_in = sim.create_resource(Box::new(Store::new(1)));
+        let dimm_merger_worker_task_in = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
         let merger_task_dispatcher = MergerWorkerDispatcher {
             merger_status_id,
             merger_task_sender: task_receiver,
@@ -306,17 +287,19 @@ impl Simulator {
                 // create the channel!
                 let num_chips = mem_settings.chips;
                 let chip_stores = (0..num_chips)
-                    .map(|_i| sim.create_resource(Box::new(Store::new(1))))
+                    .map(|_i| sim.create_resource(Box::new(Store::new(STORE_SIZE))))
                     .collect_vec();
-                let merger_status_id = merger_status.borrow_mut().create_merger_status(10);
-                let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(10)));
+                let merger_status_id = merger_status
+                    .borrow_mut()
+                    .create_merger_status(mem_settings.channel_merger_count);
+                let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
+                    mem_settings.channel_merger_count,
+                )));
 
                 let channel = ChannelMerger::new(
                     store_id,
                     chip_stores.clone(),
                     merger_resouce_id,
-                    10,
-                    10,
                     merger_status_id,
                 );
 
@@ -327,7 +310,7 @@ impl Simulator {
                 // create the merger_task_worker
                 let mut task_receiver = vec![];
                 for _i in 0..mem_settings.channel_merger_count {
-                    let resouce = sim.create_resource(Box::new(Store::new(1)));
+                    let resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
                     let merger_task_worker = MergerWorker {
                         merger_size: mem_settings.channel_merger_size,
                         merger_status_id,
@@ -341,7 +324,8 @@ impl Simulator {
                     task_receiver.push(resouce);
                 }
                 // create the channel merger_task_dispatcher
-                let channel_merger_worker_task_in = sim.create_resource(Box::new(Store::new(1)));
+                let channel_merger_worker_task_in =
+                    sim.create_resource(Box::new(Store::new(STORE_SIZE)));
                 let merger_task_dispatcher = MergerWorkerDispatcher {
                     merger_status_id,
                     merger_task_sender: task_receiver,
@@ -359,17 +343,18 @@ impl Simulator {
                         let chip_id = (channel_id, chip_id);
                         let num_banks = mem_settings.banks;
                         let bank_stores = (0..num_banks)
-                            .map(|_i| sim.create_resource(Box::new(Store::new(1))))
+                            .map(|_i| sim.create_resource(Box::new(Store::new(STORE_SIZE))))
                             .collect_vec();
-                        let merger_resouce_id =
-                            sim.create_resource(Box::new(SimpleResource::new(10)));
-                        let merger_status_id = merger_status.borrow_mut().create_merger_status(10);
+                        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
+                            mem_settings.chip_merger_count,
+                        )));
+                        let merger_status_id = merger_status
+                            .borrow_mut()
+                            .create_merger_status(mem_settings.chip_merger_count);
                         let chip = ChipMerger::new(
                             store_id,
                             bank_stores.clone(),
                             merger_resouce_id,
-                            10,
-                            10,
                             merger_status_id,
                         );
 
@@ -380,7 +365,7 @@ impl Simulator {
                         // create the merger_task_worker
                         let mut task_receiver = vec![];
                         for _i in 0..mem_settings.chip_merger_count {
-                            let resouce = sim.create_resource(Box::new(Store::new(1)));
+                            let resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
                             let merger_task_worker = MergerWorker {
                                 merger_size: mem_settings.chip_merger_size,
                                 merger_status_id,
@@ -395,7 +380,7 @@ impl Simulator {
                         }
                         // create the chip merger_task_dispatcher
                         let chip_merger_worker_task_in =
-                            sim.create_resource(Box::new(Store::new(1)));
+                            sim.create_resource(Box::new(Store::new(STORE_SIZE)));
                         let merger_task_dispatcher = MergerWorkerDispatcher {
                             merger_status_id,
                             merger_task_sender: task_receiver,
@@ -412,14 +397,13 @@ impl Simulator {
                                 // create the bank!
                                 let bank_id = (chip_id, bank_id);
 
-                                let bank_pe_stores = (0..10)
-                                    .map(|_i| sim.create_resource(Box::new(Store::new(1))))
+                                let bank_pe_stores = (0..mem_settings.bank_merger_count)
+                                    .map(|_i| sim.create_resource(Box::new(Store::new(STORE_SIZE))))
                                     .collect_vec();
                                 let bank = BankTaskReorder::new(
                                     store_id,
                                     bank_pe_stores.clone(),
-                                    10,
-                                    10,
+                                    mem_settings.reorder_count,
                                     bank_id,
                                 );
 
@@ -432,8 +416,7 @@ impl Simulator {
                                         bank_pe_store_id,
                                         chip_merger_worker_task_in,
                                         mem_settings.bank_merger_size,
-                                        10,
-                                        10,
+                                        mem_settings.bank_adder_size,
                                         store_id,
                                     );
                                     let id = sim.create_process(bank_pe.run());
@@ -448,6 +431,9 @@ impl Simulator {
 #[cfg(test)]
 mod test {
     use desim::resources::Store;
+    use sprs::CsMat;
+
+    use crate::settings::RowMapping;
 
     use super::*;
     #[test]
@@ -491,5 +477,35 @@ mod test {
         for i in events {
             println!("{:?}", i);
         }
+    }
+
+    #[test]
+    fn sim_test() {
+        let csr: CsMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")
+            .unwrap()
+            .to_csr();
+        let trans_pose = csr.clone().transpose_view().to_csr();
+        let two_matrix = TwoMatrix::new(csr, trans_pose);
+        let mem_settings = MemSettings {
+            row_size: 512,
+            banks: 8,
+            chips: 8,
+            channels: 2,
+            row_mapping: RowMapping::Chunk,
+            bank_merger_size: 8,
+            chip_merger_size: 8,
+            channel_merger_size: 8,
+            dimm_merger_size: 8,
+            simd_width: 128,
+            parallel_count: 8,
+            reorder_count: 8,
+            bank_merger_count: 8,
+            chip_merger_count: 8,
+            channel_merger_count: 8,
+            dimm_merger_count: 8,
+            row_change_latency: 8,
+            bank_adder_size: 8,
+        };
+        Simulator::run(&mem_settings, two_matrix);
     }
 }

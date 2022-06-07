@@ -43,7 +43,14 @@ where
         for i in self.a.iter() {
             debug!("i: {:?}", i);
             let row_select = i.1 .1.index();
-            let bank_id = pim::get_bank_id_from_row_id(row_select, mem_settings, num_rows);
+            let bank_id = pim::get_bank_id_from_row_id(
+                row_select,
+                mem_settings.channels,
+                mem_settings.chips,
+                mem_settings.banks,
+                num_rows,
+                &mem_settings.row_mapping,
+            );
             debug!("bank_id: {:?}", bank_id);
             let row_id_in_bank = pim::get_row_id_in_bank(row_select, mem_settings, num_rows);
             debug!("row_id_in_bank: {:?}", row_id_in_bank);
@@ -90,7 +97,14 @@ where
             debug!("row_select: {:?}", row_select);
             let target_row = i.1 .0.index();
             debug!("target_row: {:?}", target_row);
-            let bank_id = pim::get_bank_id_from_row_id(row_select, mem_settings, self.a.cols());
+            let bank_id = pim::get_bank_id_from_row_id(
+                row_select,
+                mem_settings.channels,
+                mem_settings.chips,
+                mem_settings.banks,
+                self.a.cols(),
+                &mem_settings.row_mapping,
+            );
             debug!("bank_id: {:?}", bank_id);
             let row_nnz = self.b.outer_view(row_select).unwrap().nnz();
             debug!("row_nnz: {:?}", row_nnz);
