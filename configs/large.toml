@@ -1,5 +1,5 @@
 
 mtx_files = [
-  "mtx/Groebner_id2003_aug.mtx",
+  "mtx/test.mtx",
 ]
 result_file = "results/result_large.json"

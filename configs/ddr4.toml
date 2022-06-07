@@ -1,13 +1,20 @@
 [mem_settings]
-row_size = 512
-banks = 8
-chips = 8
-channels = 2
-row_mapping = "Chunk"
+bank_merger_count = 16
 bank_merger_size = 16
-chip_merger_size = 8
+banks = 8
+channel_merger_count = 8
 channel_merger_size = 8
+channels = 2
+chip_merger_count = 8
+chip_merger_size = 8
+chips = 8
+dimm_merger_count = 8
 dimm_merger_size = 8
+parallel_count = 8
+reorder_count = 8
+row_mapping = "Chunk"
+row_size = 512
 simd_width = 8
-parallel_count=8
-reorder_count=8
+
+bank_adder_size = 16
+row_change_latency = 16
