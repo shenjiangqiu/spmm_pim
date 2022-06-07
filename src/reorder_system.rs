@@ -1,4 +1,3 @@
-
 use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Req {
@@ -88,7 +87,7 @@ mod test {
 
     #[test]
     fn float_test() {
-        let mut numbers = vec![ f64::NAN,1.0, 2.0,];
+        let mut numbers = vec![f64::NAN, 1.0, 2.0];
         numbers.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         println!("{:?}", numbers);
     }

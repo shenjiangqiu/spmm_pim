@@ -6,7 +6,7 @@ use crate::{
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
-use sprs::{CsMat};
+use sprs::CsMat;
 /// run the matrix csr x csr_transpose
 pub fn run_exp_csr<'a, const R: usize, const C: usize>(
     path: &'a Path,

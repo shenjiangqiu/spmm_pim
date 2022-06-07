@@ -445,8 +445,9 @@ mod test {
         let process1 = sim.create_process(Box::new(move |init_status: SimContext<SpmmStatus>| {
             let (_time, status) = init_status.into_inner();
             let new_status = status.copy_default();
-            yield new_status.copy_default();
-            let ret = yield new_status.copy_default();
+            yield new_status
+                .clone_with_state(SpmmStatusEnum::PushBankTask(queue1, Default::default()));
+            let ret = yield new_status.clone_with_state(SpmmStatusEnum::Pop(queue2));
             println!(
                 "ret: {:?}",
                 ret.state().state().as_push_bank_task().unwrap()
