@@ -1,4 +1,5 @@
 use desim::ResourceId;
+use log::debug;
 
 use super::{component::Component, SpmmContex, SpmmStatusEnum};
 
@@ -22,6 +23,7 @@ impl Component for MergerWorker {
             loop {
                 let context: SpmmContex =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_reciever));
+                debug!("MERGER_WORKER:id:{},{:?}", self.task_reciever, context);
                 let (_time, pop_status) = context.into_inner();
 
                 // send read request to row buffer.
@@ -29,14 +31,14 @@ impl Component for MergerWorker {
                 let (_resouce_id, (target_row, task_in_id, target_result)) =
                     state.into_push_partial_task().unwrap();
                 // first we need pop from the
+                tasks.push(target_result);
+
                 merger_status.borrow_mut().id_to_mergerstatus[self.merger_status_id]
                     .pop(target_row, task_in_id);
                 // then test if this is the last
-                if merger_status.borrow().id_to_mergerstatus[self.merger_status_id]
+                if !merger_status.borrow().id_to_mergerstatus[self.merger_status_id]
                     .exist(target_row)
                 {
-                    tasks.push(target_result);
-                } else {
                     // last, process the result, send the result and release the resource
                     let (add_time, merge_time, partial_sum) =
                         crate::pim::merge_rows_into_one(tasks.clone(), self.merger_size);

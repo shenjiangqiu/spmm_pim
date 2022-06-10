@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use desim::{ResourceId, SimContext};
 use itertools::Itertools;
+use log::debug;
 
 use super::{
     component::Component, BankID, BankTask, BankTaskEnum, SpmmContex, SpmmStatus, SpmmStatusEnum,
@@ -105,16 +106,16 @@ impl MergerStatus {
 
     pub fn pop(&mut self, target_row: usize, lower_pe_id: usize) {
         // minus one, if it's zero, remove it
-        self.current_working_merger
-            .entry(target_row)
-            .and_modify(|e| self.current_merger_worker_status[*e].del_lower_record(lower_pe_id));
+        let pe_id = self.current_working_merger[&target_row];
+        self.current_merger_worker_status[pe_id].del_lower_record(lower_pe_id);
 
-        if self.current_merger_worker_status[self.current_working_merger[&target_row]]
+        if self.current_merger_worker_status[pe_id]
             .waiting_banks
             .is_empty()
         {
             // remove it
             self.current_working_merger.remove(&target_row);
+            self.idle_merger.push_back(pe_id);
         }
     }
 
@@ -136,6 +137,7 @@ where
                 // step 1: get the finished
                 let context: SimContext<SpmmStatus> =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in()));
+                debug!("MERGER_TSK_SD:id:{},{:?}", self.get_task_in(), context);
                 let (_time, task) = context.into_inner();
                 let (_, task, merger_status, _) = task.into_inner();
                 let task = task.into_push_bank_task().unwrap().1;
@@ -147,6 +149,8 @@ where
                         to,
                         row,
                         bank_id,
+                        row_shift,
+                        row_size,
                     }) => {
                         // push to target pe and set the status
 
@@ -169,6 +173,8 @@ where
                                 to,
                                 row,
                                 bank_id,
+                                row_shift,
+                                row_size,
                             }),
                         ));
                     }

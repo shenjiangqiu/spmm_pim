@@ -52,6 +52,8 @@ where
                 &mem_settings.row_mapping,
             );
             debug!("bank_id: {:?}", bank_id);
+            // TODO: this is a bug, the row id should not get by row_celect, this real row size of bank is not the row size of the matrixs
+            // 
             let row_id_in_bank = pim::get_row_id_in_bank(row_select, mem_settings, num_rows);
             debug!("row_id_in_bank: {:?}", row_id_in_bank);
 

@@ -8,9 +8,11 @@ pub mod id_translation;
 pub mod merger_task_dispather;
 pub mod merger_task_sender;
 pub mod merger_task_worker;
+pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
+
 use desim::{
     prelude::*,
     resources::{CopyDefault, SimpleResource, Store},
@@ -18,9 +20,13 @@ use desim::{
 use enum_as_inner::EnumAsInner;
 use id_translation::*;
 use itertools::Itertools;
-use std::{cell::RefCell, collections::BTreeMap, ops::Generator, rc::Rc};
+use log::debug;
+use sprs::CsMat;
+use std::{cell::RefCell, collections::BTreeMap, ops::Generator, path::Path, rc::Rc};
 
-use crate::{csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix};
+use crate::{
+    csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix,
+};
 const STORE_SIZE: usize = 4;
 use self::{
     bank::{BankPe, BankTaskReorder},
@@ -32,6 +38,7 @@ use self::{
     merger_task_dispather::MergerWorkerDispatcher,
     merger_task_sender::FullMergerStatus,
     merger_task_worker::MergerWorker,
+    sim_time::SharedSimTime,
     task_sender::TaskSender,
 };
 #[derive(Debug, Clone, Default)]
@@ -40,8 +47,14 @@ pub struct BankTask {
     pub to: usize,
     pub row: CsVecNodata<usize>,
     pub bank_id: BankID,
+    pub row_shift: usize,
+    pub row_size: usize,
 }
-
+pub fn create_two_matrix_from_file(file_name: &Path) -> TwoMatrix<i32, i32> {
+    let csr: CsMat<i32> = sprs::io::read_matrix_market(file_name).unwrap().to_csr();
+    let trans_pose = csr.clone().transpose_view().to_csr();
+    TwoMatrix::new(csr, trans_pose)
+}
 pub type SpmmContex = SimContext<SpmmStatus>;
 pub type SpmmGenerator = dyn Generator<SpmmContex, Yield = SpmmStatus, Return = ()> + Unpin;
 //todo: add the type
@@ -78,6 +91,7 @@ pub struct SpmmStatus {
     enable_log: bool,
     shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
     shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
+    shared_sim_time: Rc<SharedSimTime>,
 }
 impl CopyDefault for SpmmStatus {
     fn copy_default(&self) -> Self {
@@ -85,11 +99,13 @@ impl CopyDefault for SpmmStatus {
 
         let shared_merger_status = self.shared_merger_status.clone();
         let shared_bankpe_status = self.shared_bankpe_status.clone();
+        let shared_sim_time = self.shared_sim_time.clone();
         Self {
             state: SpmmStatusEnum::Continue,
             enable_log,
             shared_merger_status,
             shared_bankpe_status,
+            shared_sim_time,
         }
     }
 }
@@ -99,12 +115,14 @@ impl SpmmStatus {
         state: SpmmStatusEnum,
         shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
         shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
+        shared_sim_time: Rc<SharedSimTime>,
     ) -> Self {
         Self {
             state,
             enable_log: false,
             shared_merger_status,
             shared_bankpe_status,
+            shared_sim_time,
         }
     }
 
@@ -114,36 +132,29 @@ impl SpmmStatus {
             enable_log: self.enable_log,
             shared_merger_status: self.shared_merger_status.clone(),
             shared_bankpe_status: self.shared_bankpe_status.clone(),
+            shared_sim_time: self.shared_sim_time.clone(),
         }
     }
 
     pub fn set_state(self, state: SpmmStatusEnum) -> Self {
-        Self {
-            state,
-            enable_log: self.enable_log,
-            shared_merger_status: self.shared_merger_status,
-            shared_bankpe_status: self.shared_bankpe_status,
-        }
+        Self { state, ..self }
     }
     pub fn set_log(self, enable_log: bool) -> Self {
-        Self {
-            state: self.state,
-            enable_log,
-            shared_merger_status: self.shared_merger_status,
-            shared_bankpe_status: self.shared_bankpe_status,
-        }
+        Self { enable_log, ..self }
     }
 
     pub fn new_log(
         state: SpmmStatusEnum,
         shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
         shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
+        shared_sim_time: Rc<SharedSimTime>,
     ) -> Self {
         Self {
             state,
             enable_log: true,
             shared_merger_status,
             shared_bankpe_status,
+            shared_sim_time,
         }
     }
     pub fn state(&self) -> &SpmmStatusEnum {
@@ -200,17 +211,18 @@ enum SimulationResult {
 pub struct Simulator {}
 impl Simulator {
     pub fn run(mem_settings: &MemSettings, input_matrix: TwoMatrix<i32, i32>) {
-        // the basic data
+        // 1.---- the basic data
+        debug!("start to run");
         let mut sim = Simulation::new();
         let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
         let bankpe_status = Rc::new(RefCell::new(BTreeMap::new()));
+        let sim_time = Rc::new(SharedSimTime::new());
         let status = SpmmStatus::new(
             SpmmStatusEnum::Continue,
             merger_status.clone(),
             bankpe_status.clone(),
+            sim_time.clone(),
         );
-
-        // 1. add the task sender and final reciever
 
         let final_receiver_resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
         let final_rev = FinalReceiver {
@@ -425,6 +437,8 @@ impl Simulator {
                             });
                     });
             });
+        // start
+        sim.run(EndCondition::NoEvents);
     }
 }
 
@@ -470,6 +484,7 @@ mod test {
             SpmmStatusEnum::Continue,
             Rc::new(RefCell::new(merger_task_sender::FullMergerStatus::new())),
             Rc::new(RefCell::new(BTreeMap::new())),
+            Rc::new(SharedSimTime::new()),
         );
         sim.schedule_event(0., process1, status.copy_default());
         sim.schedule_event(0., process2, status.copy_default());
@@ -482,6 +497,12 @@ mod test {
 
     #[test]
     fn sim_test() {
+        // ---- first create neccessary status structures
+        let config_str = include_str!("../../log_config_debug.yml");
+        let config = serde_yaml::from_str(config_str).unwrap();
+        log4rs::init_raw_config(config).unwrap_or(());
+
+        debug!("start");
         let csr: CsMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")
             .unwrap()
             .to_csr();
