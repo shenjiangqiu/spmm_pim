@@ -208,6 +208,9 @@ enum SimulationResult {
     Ok(SimulationReport),
     Err(SimulationErr),
 }
+
+
+
 pub struct Simulator {}
 impl Simulator {
     pub fn run(mem_settings: &MemSettings, input_matrix: TwoMatrix<i32, i32>) {
@@ -498,7 +501,7 @@ mod test {
     #[test]
     fn sim_test() {
         // ---- first create neccessary status structures
-        let config_str = include_str!("../../log_config_debug.yml");
+        let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
 

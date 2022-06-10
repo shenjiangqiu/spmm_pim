@@ -274,7 +274,7 @@ mod test {
     use crate::sim;
     #[test]
     fn test_bank() {
-        let config_str = include_str!("../../log_config_debug.yml");
+        let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
 

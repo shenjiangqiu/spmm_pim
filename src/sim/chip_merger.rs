@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn test_bank() {
         // ---- first create neccessary status structures
-        let config_str = include_str!("../../log_config_debug.yml");
+        let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
         let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
@@ -182,7 +182,7 @@ mod tests {
     // #[test]
     // fn test_bank2() {
     //     // ---- first create neccessary status structures
-    //     let config_str = include_str!("../../log_config_debug.yml");
+    //     let config_str = include_str!("../../log_config.yml");
     //     let config = serde_yaml::from_str(config_str).unwrap();
     //     log4rs::init_raw_config(config).unwrap_or(());
     //     let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
