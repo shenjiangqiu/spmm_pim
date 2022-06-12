@@ -16,9 +16,7 @@ jobs:
 
     steps:
     - name: rust-toolchain
-      uses: actions-rs/toolchain@v1.0.6
-      with:
-        default: nightly
+      run: rustup default nightly
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose
