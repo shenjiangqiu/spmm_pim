@@ -1,5 +1,6 @@
 # the spmm pim simulator
-[![Build Status](https://app.travis-ci.com/shenjiangqiu/spmm_pim.svg?token=ZSTskApXkiDQtwDrTWeW&branch=master)](https://app.travis-ci.com/shenjiangqiu/spmm_pim)
+[![github actions](https://github.com/shenjiangqiu/spmm_pim/actions/workflows/rust.yml/badge.svg?branch=master)](https://github.com/shenjiangqiu/spmm_pim/actions/workflows/rust.yml)
+[![travis-ci](https://app.travis-ci.com/shenjiangqiu/spmm_pim.svg?token=ZSTskApXkiDQtwDrTWeW&branch=master)](https://app.travis-ci.com/shenjiangqiu/spmm_pim)
 [![codecov](https://codecov.io/gh/shenjiangqiu/spmm_pim/branch/master/graph/badge.svg?token=7qAtKQKmtx)](https://codecov.io/gh/shenjiangqiu/spmm_pim)
 ## the configures for memory and graph are in configs file
 
