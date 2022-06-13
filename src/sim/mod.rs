@@ -24,9 +24,7 @@ use log::debug;
 use sprs::CsMat;
 use std::{cell::RefCell, collections::BTreeMap, ops::Generator, path::Path, rc::Rc};
 
-use crate::{
-    csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix,
-};
+use crate::{csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix};
 const STORE_SIZE: usize = 4;
 use self::{
     bank::{BankPe, BankTaskReorder},
@@ -38,7 +36,7 @@ use self::{
     merger_task_dispather::MergerWorkerDispatcher,
     merger_task_sender::FullMergerStatus,
     merger_task_worker::MergerWorker,
-    sim_time::SharedSimTime,
+    sim_time::{ComponentTime, LevelTime, SharedSimTime},
     task_sender::TaskSender,
 };
 #[derive(Debug, Clone, Default)]
@@ -79,7 +77,6 @@ pub enum SpmmStatusEnum {
     PushReadBankTask(ResourceId, BankReadRowTaskType),
     Acquire(ResourceId),
     Release(ResourceId),
-
     Pop(ResourceId),
 }
 
@@ -92,6 +89,8 @@ pub struct SpmmStatus {
     shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
     shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
     shared_sim_time: Rc<SharedSimTime>,
+    shared_level_time: Rc<LevelTime>,
+    shared_comp_time: Rc<ComponentTime>,
 }
 impl CopyDefault for SpmmStatus {
     fn copy_default(&self) -> Self {
@@ -100,12 +99,16 @@ impl CopyDefault for SpmmStatus {
         let shared_merger_status = self.shared_merger_status.clone();
         let shared_bankpe_status = self.shared_bankpe_status.clone();
         let shared_sim_time = self.shared_sim_time.clone();
+        let shared_level_time = self.shared_level_time.clone();
+        let shared_comp_time = self.shared_comp_time.clone();
         Self {
             state: SpmmStatusEnum::Continue,
             enable_log,
             shared_merger_status,
             shared_bankpe_status,
             shared_sim_time,
+            shared_level_time,
+            shared_comp_time,
         }
     }
 }
@@ -116,6 +119,8 @@ impl SpmmStatus {
         shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
         shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
         shared_sim_time: Rc<SharedSimTime>,
+        shared_level_time: Rc<LevelTime>,
+        shared_comp_time: Rc<ComponentTime>,
     ) -> Self {
         Self {
             state,
@@ -123,6 +128,8 @@ impl SpmmStatus {
             shared_merger_status,
             shared_bankpe_status,
             shared_sim_time,
+            shared_level_time,
+            shared_comp_time,
         }
     }
 
@@ -133,6 +140,8 @@ impl SpmmStatus {
             shared_merger_status: self.shared_merger_status.clone(),
             shared_bankpe_status: self.shared_bankpe_status.clone(),
             shared_sim_time: self.shared_sim_time.clone(),
+            shared_level_time: self.shared_level_time.clone(),
+            shared_comp_time: self.shared_comp_time.clone(),
         }
     }
 
@@ -148,6 +157,8 @@ impl SpmmStatus {
         shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
         shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
         shared_sim_time: Rc<SharedSimTime>,
+        shared_level_time: Rc<LevelTime>,
+        shared_comp_time: Rc<ComponentTime>,
     ) -> Self {
         Self {
             state,
@@ -155,6 +166,8 @@ impl SpmmStatus {
             shared_merger_status,
             shared_bankpe_status,
             shared_sim_time,
+            shared_level_time,
+            shared_comp_time,
         }
     }
     pub fn state(&self) -> &SpmmStatusEnum {
@@ -209,8 +222,6 @@ enum SimulationResult {
     Err(SimulationErr),
 }
 
-
-
 pub struct Simulator {}
 impl Simulator {
     pub fn run(mem_settings: &MemSettings, input_matrix: TwoMatrix<i32, i32>) {
@@ -225,6 +236,8 @@ impl Simulator {
             merger_status.clone(),
             bankpe_status.clone(),
             sim_time.clone(),
+            Rc::new(LevelTime::new()),
+            Rc::new(ComponentTime::new()),
         );
 
         let final_receiver_resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
@@ -488,6 +501,8 @@ mod test {
             Rc::new(RefCell::new(merger_task_sender::FullMergerStatus::new())),
             Rc::new(RefCell::new(BTreeMap::new())),
             Rc::new(SharedSimTime::new()),
+            Rc::new(LevelTime::new()),
+            Rc::new(ComponentTime::new()),
         );
         sim.schedule_event(0., process1, status.copy_default());
         sim.schedule_event(0., process2, status.copy_default());

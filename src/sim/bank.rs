@@ -57,14 +57,15 @@ impl BankMergerStatus {
         self.current_working_merger.contains_key(&_target_row)
     }
 }
-
+#[derive(Default)]
 pub struct FullBankMergerStatus {
     status: Vec<BankMergerStatus>,
 }
 
 impl FullBankMergerStatus {
+    // generate an empty merger status
     pub fn new() -> Self {
-        Self { status: vec![] }
+        Default::default()
     }
     pub fn create_bank_merger_status(&mut self, total_merger: usize) -> usize {
         self.status.push(BankMergerStatus::new(total_merger));
@@ -314,6 +315,8 @@ mod test {
             Rc::new(RefCell::new(FullMergerStatus::new())),
             Rc::new(RefCell::new(BTreeMap::new())),
             Rc::new(SharedSimTime::new()),
+            Rc::new(Default::default()),
+            Rc::new(Default::default()),
         );
         simulator.schedule_event(
             0.0,

@@ -91,6 +91,8 @@ mod tests {
             merger_status.clone(),
             Rc::new(RefCell::new(BTreeMap::new())),
             sim_time.clone(),
+            Rc::new(Default::default()),
+            Rc::new(Default::default()),
         );
         debug!("start test");
         let mut simulator = Simulation::new();

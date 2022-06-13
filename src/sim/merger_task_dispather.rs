@@ -25,13 +25,12 @@ impl Component for MergerWorkerDispatcher {
                 let (_, task, merger_status, _) = ret_status.into_inner();
                 let (target_row, task_in_id, target_result) =
                     task.into_push_partial_task().unwrap().1;
-                let target_pe = merger_status
+                let target_pe = *merger_status
                     .borrow()
                     .get_merger_status(self.merger_status_id)
                     .current_working_merger
                     .get(&target_row)
-                    .unwrap()
-                    .clone();
+                    .unwrap();
 
                 // push the partial result back
                 yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
