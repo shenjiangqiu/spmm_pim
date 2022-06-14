@@ -7,7 +7,10 @@ use desim::ResourceId;
 use log::debug;
 
 use super::{component::Component, BankID, BankTask, SpmmContex, SpmmStatusEnum};
-use crate::{pim::merge_rows_into_one, sim::BankTaskEnum};
+use crate::{
+    pim::merge_rows_into_one,
+    sim::{BankTaskEnum, SpmmStatus},
+};
 
 /// merger status
 /// - total_merger: number of total merger workers
@@ -87,6 +90,7 @@ pub struct BankPe {
 
     // just for record
     pub task_sender_input_id: ResourceId,
+    pub comp_id: usize,
 }
 
 impl BankPe {
@@ -97,6 +101,7 @@ impl BankPe {
         adder_size: usize,
 
         task_sender_input_id: ResourceId,
+        comp_id: usize,
     ) -> Self {
         Self {
             task_in,
@@ -104,6 +109,7 @@ impl BankPe {
             merger_size,
             adder_size,
             task_sender_input_id,
+            comp_id,
         }
     }
 }
@@ -115,16 +121,30 @@ impl Component for BankPe {
             let (_time, status) = context.into_inner();
             let mut current_task = 0;
             let mut tasks = vec![];
+            let mut current_time = 0.;
             loop {
                 let context: SpmmContex =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (time, pop_status) = context.into_inner();
                 debug!("BANK_PE: time: {},received taske: {:?}", time, pop_status);
+                let gap = time - current_time;
+                current_time = time;
 
                 // send read request to row buffer.
-                let (_enable_log, state, _merger_status, _bank_status) = pop_status.into_inner();
-                let (_resouce_id, bank_task) = state.into_push_bank_task().unwrap();
 
+                let SpmmStatus {
+                    shared_merger_status,
+                    shared_bankpe_status,
+                    shared_sim_time,
+                    shared_level_time,
+                    shared_comp_time,
+                    state,
+                    enable_log,
+                } = pop_status;
+                let (_resouce_id, bank_task) = state.into_push_bank_task().unwrap();
+                unsafe {
+                    shared_comp_time.add_idle_time(self.comp_id, gap);
+                }
                 match bank_task {
                     BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
                         tasks.push(row);
@@ -181,7 +201,15 @@ impl Component for BankTaskReorder {
                     "TASK_REORDER: time: {},received taske: {:?}",
                     time, pop_status
                 );
-                let (_enable_log, state, _merger_status, _bank_status) = pop_status.into_inner();
+                let SpmmStatus {
+                    state,
+                    enable_log,
+                    shared_merger_status,
+                    shared_bankpe_status,
+                    shared_sim_time,
+                    shared_level_time,
+                    shared_comp_time,
+                } = pop_status;
                 let (_resouce_id, task) = state.into_push_bank_task().unwrap();
 
                 match task {
@@ -212,6 +240,7 @@ impl Component for BankTaskReorder {
                                 yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
                             }
                         }
+
                         status.shared_sim_time.add_bank_read(total_waiting);
                         current_row = inner_row_id_end;
 
@@ -266,8 +295,11 @@ mod test {
     use crate::{
         settings::RowMapping,
         sim::{
-            final_receiver::FinalReceiver, merger_task_sender::FullMergerStatus,
-            sim_time::SharedSimTime, task_sender::TaskSender, SpmmStatus,
+            final_receiver::FinalReceiver,
+            merger_task_sender::FullMergerStatus,
+            sim_time::{ComponentTime, LevelTime, SharedSimTime},
+            task_sender::TaskSender,
+            SpmmStatus,
         },
     };
 
@@ -278,7 +310,16 @@ mod test {
         let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
-
+        let shared_level_time: Rc<LevelTime> = Rc::new(Default::default());
+        let shared_comp_time: Rc<ComponentTime> = Rc::new(Default::default());
+        let status = SpmmStatus::new(
+            SpmmStatusEnum::Continue,
+            Rc::new(RefCell::new(FullMergerStatus::new())),
+            Rc::new(RefCell::new(BTreeMap::new())),
+            Rc::new(SharedSimTime::new()),
+            shared_level_time.clone(),
+            shared_comp_time.clone(),
+        );
         debug!("start test");
         let mut simulator = Simulation::new();
         let two_mat = sim::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
@@ -302,7 +343,8 @@ mod test {
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in);
+                let comp_id = shared_comp_time.add_component();
+                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in, comp_id);
                 pes.push(pe_comp);
             }
             pes
@@ -310,14 +352,6 @@ mod test {
         let bank_task_reorder = simulator.create_process(bank_task_reorder.run());
         let task_sender = simulator.create_process(task_sender.run());
 
-        let status = SpmmStatus::new(
-            SpmmStatusEnum::Continue,
-            Rc::new(RefCell::new(FullMergerStatus::new())),
-            Rc::new(RefCell::new(BTreeMap::new())),
-            Rc::new(SharedSimTime::new()),
-            Rc::new(Default::default()),
-            Rc::new(Default::default()),
-        );
         simulator.schedule_event(
             0.0,
             bank_task_reorder,

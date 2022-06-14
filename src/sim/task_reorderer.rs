@@ -34,7 +34,7 @@ impl Component for TaskReorderer {
                 let task: SpmmContex =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (_time, state) = task.into_inner();
-                let (_, state, _, _) = state.into_inner();
+                let (_, state, _, _, _, _) = state.into_inner();
                 let task = state.into_push_bank_task().unwrap().1;
                 // do some reorder work
 

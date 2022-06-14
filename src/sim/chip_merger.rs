@@ -12,6 +12,7 @@ pub struct ChipMerger {
 
     // settings
     pub merger_status_id: usize,
+    pub self_level_time_id: usize,
 }
 
 impl ChipMerger {
@@ -20,12 +21,14 @@ impl ChipMerger {
         lower_pes: Vec<ResourceId>,
         merger_resouce: ResourceId,
         merger_status_id: usize,
+        self_level_time_id: usize,
     ) -> Self {
         Self {
             task_in,
             lower_pes,
             merger_resouce,
             merger_status_id,
+            self_level_time_id,
         }
     }
 }
@@ -71,7 +74,7 @@ mod tests {
             component::Component,
             final_receiver::FinalReceiver,
             merger_task_worker::MergerWorker,
-            sim_time::SharedSimTime,
+            sim_time::{ComponentTime, LevelTime, SharedSimTime},
             task_sender::TaskSender,
             SpmmStatus, SpmmStatusEnum,
         },
@@ -86,13 +89,15 @@ mod tests {
         log4rs::init_raw_config(config).unwrap_or(());
         let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
         let sim_time = Rc::new(SharedSimTime::new());
+        let level_time = Rc::new(LevelTime::new());
+        let comp_time = Rc::new(ComponentTime::new());
         let status = SpmmStatus::new(
             SpmmStatusEnum::Continue,
             merger_status.clone(),
             Rc::new(RefCell::new(BTreeMap::new())),
             sim_time.clone(),
-            Rc::new(Default::default()),
-            Rc::new(Default::default()),
+            level_time.clone(),
+            comp_time.clone(),
         );
         debug!("start test");
         let mut simulator = Simulation::new();
@@ -124,12 +129,15 @@ mod tests {
             1,
             RowMapping::Chunk,
         );
+        let chip_level_id = level_time.add_level();
         let chip_merger = ChipMerger::new(
             sender_to_chip,
             vec![chip_to_bank],
             chip_merger_resouce,
             chip_merger_status_id,
+            chip_level_id,
         );
+        let comp_id = comp_time.add_component();
         let chip_woker = MergerWorker {
             merger_size: 4,
             merger_status_id: chip_merger_status_id,
@@ -137,13 +145,23 @@ mod tests {
             partial_sum_sender: final_partial_return,
             task_reciever: bank_to_chip_partial_return,
             task_sender_input_id: sender_to_chip,
+            self_level_id: chip_level_id,
+            comp_id,
         };
         let bank_task_reorder =
             BankTaskReorder::new(chip_to_bank, bank_to_bank_merger.clone(), 4, ((0, 0), 0));
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in bank_to_bank_merger {
-                let pe_comp = BankPe::new(pe_in, bank_to_chip_partial_return, 4, 4, chip_to_bank);
+                let comp_id = comp_time.add_component();
+                let pe_comp = BankPe::new(
+                    pe_in,
+                    bank_to_chip_partial_return,
+                    4,
+                    4,
+                    chip_to_bank,
+                    comp_id,
+                );
                 pes.push(pe_comp);
             }
             pes

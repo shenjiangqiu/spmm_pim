@@ -9,6 +9,8 @@
 
 use std::cell::UnsafeCell;
 
+use serde::Serialize;
+
 /// # ( Ꙭ) this component contains the idle time of each component
 /// - this structure should be instantiated by each component
 #[derive(Default, Debug)]
@@ -105,7 +107,7 @@ impl LevelTime {
             .push(time);
     }
 }
-
+/// # ( Ꙭ) this component contains the overall time for the whole simulation
 #[derive(Debug, Default)]
 pub struct SimTime {
     pub bank_read: f64,
@@ -117,7 +119,7 @@ pub struct SimTime {
 /// this structure is used to record the simulation time of each banks time break!
 #[derive(Debug, Default)]
 pub struct SharedSimTime {
-    inner: UnsafeCell<SimTime>,
+   pub inner: UnsafeCell<SimTime>,
 }
 
 impl SharedSimTime {

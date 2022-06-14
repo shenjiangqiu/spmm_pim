@@ -17,7 +17,7 @@ pub trait MergerTaskSender {
     fn get_merger_resouce_id(&self) -> ResourceId;
     fn get_merger_status_id(&self) -> usize;
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MergerWorkerStatus {
     pub waiting_banks: BTreeSet<usize>,
 }
@@ -35,7 +35,7 @@ impl MergerWorkerStatus {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FullMergerStatus {
     pub id_to_mergerstatus: Vec<MergerStatus>,
 }
@@ -139,7 +139,7 @@ where
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in()));
                 debug!("MERGER_TSK_SD:id:{},{:?}", self.get_task_in(), context);
                 let (_time, task) = context.into_inner();
-                let (_, task, merger_status, _) = task.into_inner();
+                let (_, task, merger_status, _, _, _) = task.into_inner();
                 let task = task.into_push_bank_task().unwrap().1;
                 let status_id = self.get_merger_status_id();
 

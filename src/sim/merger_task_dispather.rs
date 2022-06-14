@@ -10,6 +10,7 @@ pub struct MergerWorkerDispatcher {
 
     // the merger status id
     pub merger_status_id: usize,
+    pub self_level_id: usize,
 }
 
 impl Component for MergerWorkerDispatcher {
@@ -22,7 +23,7 @@ impl Component for MergerWorkerDispatcher {
                 let task: SpmmContex =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.partial_sum_task_in));
                 let (_, ret_status) = task.into_inner();
-                let (_, task, merger_status, _) = ret_status.into_inner();
+                let (_, task, merger_status, _, _, _) = ret_status.into_inner();
                 let (target_row, task_in_id, target_result) =
                     task.into_push_partial_task().unwrap().1;
                 let target_pe = *merger_status
