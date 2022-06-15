@@ -1,15 +1,15 @@
 [mem_settings]
-bank_merger_count = 16
+bank_merger_count = 2
 bank_merger_size = 16
 banks = 8
 channel_merger_count = 8
-channel_merger_size = 8
+channel_merger_size = 16
 channels = 2
 chip_merger_count = 8
-chip_merger_size = 8
+chip_merger_size = 16
 chips = 8
-dimm_merger_count = 8
-dimm_merger_size = 8
+dimm_merger_count =16
+dimm_merger_size = 16
 parallel_count = 8
 reorder_count = 8
 row_mapping = "Chunk"

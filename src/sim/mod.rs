@@ -600,15 +600,15 @@ impl Simulator {
                 histogram.value_at_quantile(0.5),
                 histogram.value_at_quantile(0.75)
             );
-            let Histogram = histogram_work_gap.get(v).unwrap();
+            let histogram = histogram_work_gap.get(v).unwrap();
             info!(
                 "level_work_gap:mean: {:?} max: {} min: {}, 25qt: {}, 50qt: {}, 75qt: {} ",
-                Histogram.mean(),
-                Histogram.max(),
-                Histogram.min(),
-                Histogram.value_at_quantile(0.25),
-                Histogram.value_at_quantile(0.5),
-                Histogram.value_at_quantile(0.75)
+                histogram.mean(),
+                histogram.max(),
+                histogram.min(),
+                histogram.value_at_quantile(0.25),
+                histogram.value_at_quantile(0.5),
+                histogram.value_at_quantile(0.75)
             );
         }
     }
