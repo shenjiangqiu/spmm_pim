@@ -133,13 +133,13 @@ impl Component for BankPe {
                 // send read request to row buffer.
 
                 let SpmmStatus {
-                    shared_merger_status,
-                    shared_bankpe_status,
-                    shared_sim_time,
-                    shared_level_time,
+                    shared_merger_status: _,
+                    shared_bankpe_status: _,
+                    shared_sim_time: _,
+                    shared_level_time: _,
                     shared_comp_time,
                     state,
-                    enable_log,
+                    enable_log: _,
                 } = pop_status;
                 let (_resouce_id, bank_task) = state.into_push_bank_task().unwrap();
                 unsafe {
@@ -182,6 +182,8 @@ pub struct BankTaskReorder {
 
     pub total_reorder_size: usize,
     pub self_id: BankID,
+
+    pub bank_change_latency: f64,
 }
 
 impl Component for BankTaskReorder {
@@ -203,12 +205,12 @@ impl Component for BankTaskReorder {
                 );
                 let SpmmStatus {
                     state,
-                    enable_log,
-                    shared_merger_status,
-                    shared_bankpe_status,
-                    shared_sim_time,
-                    shared_level_time,
-                    shared_comp_time,
+                    enable_log: _,
+                    shared_merger_status: _,
+                    shared_bankpe_status: _,
+                    shared_sim_time: _,
+                    shared_level_time: _,
+                    shared_comp_time: _,
                 } = pop_status;
                 let (_resouce_id, task) = state.into_push_bank_task().unwrap();
 
@@ -231,6 +233,7 @@ impl Component for BankTaskReorder {
                         let mut total_waiting = 0.;
                         if inner_row_id_start == current_row {
                             for _i in inner_row_id_start..inner_row_id_end {
+                                // TODO , read the setting
                                 total_waiting += 16.;
                                 yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
                             }
@@ -277,12 +280,14 @@ impl BankTaskReorder {
         task_out: Vec<ResourceId>,
         total_reorder_size: usize,
         self_id: BankID,
+        bank_change_latency: f64,
     ) -> Self {
         Self {
             task_in,
             task_out,
             total_reorder_size,
             self_id,
+            bank_change_latency,
         }
     }
 }
@@ -317,7 +322,7 @@ mod test {
             Rc::new(RefCell::new(FullMergerStatus::new())),
             Rc::new(RefCell::new(BTreeMap::new())),
             Rc::new(SharedSimTime::new()),
-            shared_level_time.clone(),
+            shared_level_time,
             shared_comp_time.clone(),
         );
         debug!("start test");
@@ -339,7 +344,7 @@ mod test {
         };
 
         let partial_return = simulator.create_resource(Box::new(Store::new(16)));
-        let bank_task_reorder = BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0));
+        let bank_task_reorder = BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0), 33.);
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {

@@ -6,7 +6,7 @@ use std::{
 
 use sprs::{CsVecI, SpIndex};
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct CsVecNodata<I>
 where
     I: SpIndex,

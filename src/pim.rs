@@ -14,7 +14,7 @@ use crate::{
 /// for each element in `data`
 /// it contains the `(target_index, target_row_size)`
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PartialSumSize {
     pub data: Vec<(usize, usize)>,
 }
@@ -50,7 +50,7 @@ impl PartialSumSize {
 /// for each element in `data`
 /// it contains the `(target_index, target_row_size)`
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PartialSum<I>
 where
     I: SpIndex,
@@ -93,7 +93,7 @@ where
         self.data.push(item);
     }
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MergeCycle {
     pub add_cycle: usize,
     pub merge_cycle: usize,
@@ -145,13 +145,13 @@ pub fn get_bank_id_from_row_id(
             } else {
                 row_id / rows_per_bank
             };
-            let bank_id = if bank_id >= num_banks {
+            
+
+            if bank_id >= num_banks {
                 row_id % num_banks
             } else {
                 bank_id
-            };
-
-            bank_id
+            }
         }
         crate::settings::RowMapping::Interleaved => row_id % num_banks,
     }

@@ -27,7 +27,10 @@ fn main() -> Result<()> {
 fn _main(args: Args) -> Result<()> {
     let config_str = include_str!("../log_config.yml");
     let config = serde_yaml::from_str(config_str).unwrap();
-    log4rs::init_raw_config(config).unwrap();
+    log4rs::init_raw_config(config).unwrap_or_else(|err| {
+        error!("log4rs init error: {}", err);
+    });
+    info!("start sim with {:?}", args);
 
     let start_time = std::time::Instant::now();
     if let Some(generator) = args.generator {
@@ -121,7 +124,24 @@ mod test_main {
 
     #[test]
     fn test_main() {
-        let args = vec!["spmm_pim", "configs/default.toml", "configs/ddr4.toml"];
+        let args = vec![
+            "spmm_pim",
+            "-r",
+            "pim",
+            "configs/default.toml",
+            "configs/ddr4.toml",
+        ];
+        let args = Args::parse_from(args);
+        println!("hello world!");
+        super::_main(args).unwrap();
+
+        let args = vec![
+            "spmm_pim",
+            "-r",
+            "sim",
+            "configs/default.toml",
+            "configs/ddr4.toml",
+        ];
         let args = Args::parse_from(args);
         println!("hello world!");
         super::_main(args).unwrap();

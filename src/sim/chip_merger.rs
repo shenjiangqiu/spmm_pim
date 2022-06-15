@@ -95,7 +95,7 @@ mod tests {
             SpmmStatusEnum::Continue,
             merger_status.clone(),
             Rc::new(RefCell::new(BTreeMap::new())),
-            sim_time.clone(),
+            sim_time,
             level_time.clone(),
             comp_time.clone(),
         );
@@ -149,7 +149,7 @@ mod tests {
             comp_id,
         };
         let bank_task_reorder =
-            BankTaskReorder::new(chip_to_bank, bank_to_bank_merger.clone(), 4, ((0, 0), 0));
+            BankTaskReorder::new(chip_to_bank, bank_to_bank_merger.clone(), 4, ((0, 0), 0),33.);
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in bank_to_bank_merger {

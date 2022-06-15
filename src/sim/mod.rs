@@ -51,7 +51,7 @@ pub struct BankTask {
 }
 pub fn create_two_matrix_from_file(file_name: &Path) -> TwoMatrix<i32, i32> {
     let csr: CsMat<i32> = sprs::io::read_matrix_market(file_name).unwrap().to_csr();
-    let trans_pose = csr.clone().transpose_view().to_csr();
+    let trans_pose = csr.transpose_view().to_csr();
     TwoMatrix::new(csr, trans_pose)
 }
 pub type SpmmContex = SimContext<SpmmStatus>;
@@ -114,6 +114,15 @@ impl CopyDefault for SpmmStatus {
     }
 }
 
+type StatusTuple = (
+    bool,
+    SpmmStatusEnum,
+    Rc<RefCell<merger_task_sender::FullMergerStatus>>,
+    Rc<RefCell<BTreeMap<PeID, usize>>>,
+    Rc<LevelTime>,
+    Rc<ComponentTime>,
+);
+
 impl SpmmStatus {
     pub fn new(
         state: SpmmStatusEnum,
@@ -174,16 +183,7 @@ impl SpmmStatus {
     pub fn state(&self) -> &SpmmStatusEnum {
         &self.state
     }
-    pub fn into_inner(
-        self,
-    ) -> (
-        bool,
-        SpmmStatusEnum,
-        Rc<RefCell<merger_task_sender::FullMergerStatus>>,
-        Rc<RefCell<BTreeMap<PeID, usize>>>,
-        Rc<LevelTime>,
-        Rc<ComponentTime>,
-    ) {
+    pub fn into_inner(self) -> StatusTuple {
         (
             self.enable_log,
             self.state,
@@ -267,7 +267,7 @@ impl Simulator {
             SpmmStatusEnum::Continue,
             merger_status.clone(),
             bankpe_status,
-            sim_time.clone(),
+            sim_time,
             shared_level_time.clone(),
             shared_comp_time.clone(),
         );
@@ -506,6 +506,7 @@ impl Simulator {
                                     bank_pe_stores.clone(),
                                     mem_settings.reorder_count,
                                     bank_id,
+                                    mem_settings.row_change_latency as f64,
                                 );
 
                                 // create the process
@@ -680,7 +681,7 @@ mod test {
         let csr: CsMat<i32> = sprs::io::read_matrix_market("mtx/bfwa62.mtx")
             .unwrap()
             .to_csr();
-        let trans_pose = csr.clone().transpose_view().to_csr();
+        let trans_pose = csr.transpose_view().to_csr();
         let two_matrix = TwoMatrix::new(csr, trans_pose);
         let mem_settings = MemSettings {
             row_size: 512,

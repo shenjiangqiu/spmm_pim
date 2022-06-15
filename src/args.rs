@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgEnum, Parser, ValueHint};
+use clap::{Parser, ValueHint};
 use clap_complete::Shell;
 
 #[derive(Parser, Debug)]

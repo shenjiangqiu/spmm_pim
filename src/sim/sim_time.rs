@@ -9,8 +9,6 @@
 
 use std::cell::UnsafeCell;
 
-use serde::Serialize;
-
 /// # ( Ꙭ) this component contains the idle time of each component
 /// - this structure should be instantiated by each component
 #[derive(Default, Debug)]
@@ -59,7 +57,7 @@ impl ComponentTime {
 /// this component is used to record the finished time of each level(like bank, chip, channel)
 /// # (◍•ᴗ•◍)
 /// - this structure should be instantiated by each level
-#[derive(Default,Debug)]
+#[derive(Default, Debug)]
 pub struct LevelTime {
     // (f64,f64) means finished time and gap between finished time and first coming time
     pub level_finished_time: UnsafeCell<Vec<Vec<(f64, f64)>>>,
@@ -119,7 +117,7 @@ pub struct SimTime {
 /// this structure is used to record the simulation time of each banks time break!
 #[derive(Debug, Default)]
 pub struct SharedSimTime {
-   pub inner: UnsafeCell<SimTime>,
+    pub inner: UnsafeCell<SimTime>,
 }
 
 impl SharedSimTime {
