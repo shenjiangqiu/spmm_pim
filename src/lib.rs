@@ -12,7 +12,7 @@ pub mod run;
 pub mod settings;
 pub mod sim;
 pub mod two_matrix;
-pub mod utils;
+pub(self) mod utils;
 
 use std::{io::BufReader, path::Path};
 

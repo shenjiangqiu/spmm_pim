@@ -3,10 +3,12 @@ use std::path::Path;
 use crate::{
     bsr::Bsr, pim::Pim, result::SingleResult, settings::MemSettings, two_matrix::TwoMatrix,
 };
+
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
 use sprs::CsMat;
+
 /// run the matrix csr x csr_transpose
 pub fn run_exp_csr<'a, const R: usize, const C: usize>(
     path: &'a Path,

@@ -12,7 +12,6 @@ pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
-
 use desim::{
     prelude::*,
     resources::{CopyDefault, SimpleResource, Store},
