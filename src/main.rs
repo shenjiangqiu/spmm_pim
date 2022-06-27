@@ -1,5 +1,5 @@
-use std::env::args_os;
-use std::io;
+use std::io::{self, Write};
+use std::{env::args_os, fs::File};
 
 use clap::{Command, IntoApp, Parser};
 use clap_complete::Generator;
@@ -60,6 +60,7 @@ fn _main(args: Args) -> Result<()> {
         RunMode::Sim => {
             info!("sim start");
             let graph_name = settings.mtx_files;
+            let result_file = settings.result_file;
             let results: Vec<eyre::Result<_>> = graph_name
                 .iter()
                 .map(|name| {
@@ -67,9 +68,22 @@ fn _main(args: Args) -> Result<()> {
                     let csr: CsMat<i32> = sprs::io::read_matrix_market(name)
                         .wrap_err(format!("{:?} is error!", name))?
                         .to_csr();
+                    let mtx_file_name = name.file_stem().unwrap();
                     let trans_pose = csr.transpose_view().to_csr();
                     let two_matrix = TwoMatrix::new(csr, trans_pose);
-                    spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix);
+                    let result = spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?;
+                    // write the result to file
+                    let file_name = format!(
+                        "{}_{}.txt",
+                        result_file.display(),
+                        mtx_file_name.to_str().unwrap()
+                    );
+                    let mut file = File::create(&file_name)
+                        .wrap_err(format!("the path: {} is invalid!", file_name))?;
+                    for i in result {
+                        writeln!(file, "{}", i)?;
+                    }
+
                     info!("finished graph: {:?}", name);
                     Ok(name)
                 })

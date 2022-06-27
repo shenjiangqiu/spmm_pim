@@ -67,6 +67,7 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         dimm_merger_count: 8,
         row_change_latency: 8,
         bank_adder_size: 8,
+        store_size:1,
     };
     let csr: CsMat<_> = tri.to_csr();
 

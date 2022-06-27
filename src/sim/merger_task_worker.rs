@@ -3,6 +3,7 @@ use log::debug;
 
 use super::{component::Component, SpmmContex, SpmmStatusEnum};
 
+/// - `MergerWorker`: this is the worker for each level, there should be multile instance for each level!
 pub struct MergerWorker {
     pub task_reciever: ResourceId,
     pub partial_sum_sender: ResourceId,
@@ -14,6 +15,7 @@ pub struct MergerWorker {
     pub task_sender_input_id: ResourceId,
     pub self_level_id: usize,
     pub comp_id: usize,
+    pub return_idle_id: usize,
 }
 
 impl Component for MergerWorker {
@@ -24,7 +26,7 @@ impl Component for MergerWorker {
             let mut tasks = vec![];
             let mut the_first = true;
             let mut the_first_time = 0.;
-            let mut current_time=0.;
+            let mut current_time = 0.;
             loop {
                 let context: SpmmContex =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_reciever));
@@ -32,6 +34,7 @@ impl Component for MergerWorker {
                 let (_time, pop_status) = context.into_inner();
                 // FIX BUG HERE, THE _TIME IS SHADDOWED
                 let idle_time = _time - current_time;
+                current_time = _time;
                 if the_first {
                     the_first = false;
                     the_first_time = _time;
@@ -65,19 +68,33 @@ impl Component for MergerWorker {
                     unsafe {
                         level_time.add_finished_time(self.self_level_id, (wait_time, gap));
                     }
-                    yield status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
+                    let context = yield status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
+                    let (_time, _wait_status) = context.into_inner();
+                    current_time = _time;
                     // push to upper
-                    yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
+                    let context = yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                         self.partial_sum_sender,
                         (target_row, self.task_sender_input_id, partial_sum),
                     ));
+                    let (_time, _push_status) = context.into_inner();
+                    let return_idle_time = _time - current_time;
+                    unsafe {
+                        comp_time.add_idle_time(self.return_idle_id, return_idle_time);
+                    }
+                    current_time = _time;
+
                     tasks.clear();
-                    yield status
+
+                    let context = yield status
                         .clone_with_state(SpmmStatusEnum::Release(self.merger_work_resource));
+                    let (_time, _release_status) = context.into_inner();
+                    assert_eq!(_time, current_time);
+                    current_time = _time;
                 }
                 // START TO WAIT FOR THE NEXT TASK
-                current_time = _time;
-
+                // bug here, the current_time is not really the time of this point!!!! all previouse result are totally wrong!!!
+                // current_time = _time;
+                // FIXED!
             }
         })
     }

@@ -50,6 +50,9 @@ pub struct MemSettings {
 
     // add size
     pub bank_adder_size: usize,
+
+    // the store buffer size
+    pub store_size:usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

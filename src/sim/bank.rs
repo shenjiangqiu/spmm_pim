@@ -3,7 +3,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
 };
 const BANK_ROW_SIZE: usize = 2048;
-use desim::ResourceId;
+use desim::{ResourceId};
 use log::debug;
 
 use super::{component::Component, BankID, BankTask, SpmmContex, SpmmStatusEnum};
@@ -91,6 +91,7 @@ pub struct BankPe {
     // just for record
     pub task_sender_input_id: ResourceId,
     pub comp_id: usize,
+    pub return_idle_id: usize,
 }
 
 impl BankPe {
@@ -102,6 +103,7 @@ impl BankPe {
 
         task_sender_input_id: ResourceId,
         comp_id: usize,
+        return_idle_id: usize,
     ) -> Self {
         Self {
             task_in,
@@ -110,6 +112,7 @@ impl BankPe {
             adder_size,
             task_sender_input_id,
             comp_id,
+            return_idle_id,
         }
     }
 }
@@ -121,6 +124,7 @@ impl Component for BankPe {
             let (_time, status) = context.into_inner();
             let mut current_task = 0;
             let mut tasks = vec![];
+            // this is used for record the current time before each yield
             let mut current_time = 0.;
             loop {
                 let context: SpmmContex =
@@ -160,11 +164,22 @@ impl Component for BankPe {
                             // todo: refine the add cycle according to the adder size
                             let wait_time = cmp::max(add_cycle, merge_cycle) as f64;
                             status.shared_sim_time.add_bank_merge(wait_time);
-                            yield status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
-                            yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
-                                self.partial_out,
-                                (current_task, self.task_sender_input_id, data),
-                            ));
+                            let context =
+                                yield status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
+                            let (_time, status) = context.into_inner();
+                            current_time = _time;
+                            // this could be idle due to upper pressure
+                            let context =
+                                yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
+                                    self.partial_out,
+                                    (current_task, self.task_sender_input_id, data),
+                                ));
+                            let (_time, _status) = context.into_inner();
+                            let return_gap = _time - current_time;
+                            current_time = _time;
+                            unsafe {
+                                shared_comp_time.add_idle_time(self.return_idle_id, return_gap);
+                            }
                         }
 
                         tasks.clear();
@@ -364,7 +379,16 @@ mod test {
             let mut pes = vec![];
             for pe_in in task_pe {
                 let comp_id = shared_comp_time.add_component("123");
-                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in, comp_id);
+                let retrun_idle_id = shared_comp_time.add_component("123");
+                let pe_comp = BankPe::new(
+                    pe_in,
+                    partial_return,
+                    4,
+                    4,
+                    task_in,
+                    comp_id,
+                    retrun_idle_id,
+                );
                 pes.push(pe_comp);
             }
             pes

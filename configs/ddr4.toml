@@ -24,3 +24,4 @@ simd_width = 8
 
 bank_adder_size = 16
 row_change_latency = 33
+store_size=8
