@@ -319,7 +319,7 @@ impl Simulator {
         let mut task_receiver = vec![];
         for i in 0..mem_settings.dimm_merger_count {
             let resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
-            let comp_id = shared_comp_time.add_component();
+            let comp_id = shared_comp_time.add_component(format!("dimm-{i}"));
             comp_ids.insert(
                 MergerId {
                     level_id: LevelId::Dimm,
@@ -341,6 +341,7 @@ impl Simulator {
             sim.schedule_event(0., id, status.clone());
             task_receiver.push(resouce);
         }
+
         // create the dimm merger_task_dispatcher
         let dimm_merger_worker_task_in = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
         let merger_task_dispatcher = MergerWorkerDispatcher {
@@ -349,6 +350,7 @@ impl Simulator {
             partial_sum_task_in: dimm_merger_worker_task_in,
             self_level_id: dimm_id,
         };
+
         let id = sim.create_process(merger_task_dispatcher.run());
         sim.schedule_event(0., id, status.clone());
 
@@ -386,7 +388,7 @@ impl Simulator {
                 let mut task_receiver = vec![];
                 for i in 0..mem_settings.channel_merger_count {
                     let resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
-                    let comp_id = shared_comp_time.add_component();
+                    let comp_id = shared_comp_time.add_component("123");
                     comp_ids.insert(
                         MergerId {
                             level_id: LevelId::Channel(channel_id),
@@ -455,7 +457,7 @@ impl Simulator {
                         let mut task_receiver = vec![];
                         for _i in 0..mem_settings.chip_merger_count {
                             let resouce = sim.create_resource(Box::new(Store::new(STORE_SIZE)));
-                            let comp_id = shared_comp_time.add_component();
+                            let comp_id = shared_comp_time.add_component("123");
                             comp_ids.insert(
                                 MergerId {
                                     level_id: LevelId::Chip(chip_id),
@@ -500,12 +502,15 @@ impl Simulator {
                                 let bank_pe_stores = (0..mem_settings.bank_merger_count)
                                     .map(|_i| sim.create_resource(Box::new(Store::new(STORE_SIZE))))
                                     .collect_vec();
+
+                                let comp_id = shared_comp_time.add_component("1123");
                                 let bank = BankTaskReorder::new(
                                     store_id,
                                     bank_pe_stores.clone(),
                                     mem_settings.reorder_count,
                                     bank_id,
                                     mem_settings.row_change_latency as f64,
+                                    comp_id,
                                 );
 
                                 // create the process
@@ -513,7 +518,7 @@ impl Simulator {
                                 sim.schedule_event(0., id, status.clone());
 
                                 for bank_pe_store_id in bank_pe_stores {
-                                    let comp_id = shared_comp_time.add_component();
+                                    let comp_id = shared_comp_time.add_component("33");
                                     comp_ids.insert(
                                         MergerId {
                                             level_id: LevelId::Bank(bank_id),
@@ -543,8 +548,8 @@ impl Simulator {
         // build the histogram
         let histograms_idle = unsafe { &*shared_comp_time.componet_idle_time.get() }
             .iter()
-            .map(|x| {
-                x.iter()
+            .map(|(_x, v)| {
+                v.iter()
                     .fold(Histogram::<u64>::new(3).unwrap(), |mut acc, item| {
                         acc += *item as u64;
                         acc

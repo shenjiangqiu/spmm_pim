@@ -8,13 +8,13 @@ pub mod pim;
 pub mod reorder_calculator;
 pub mod reorder_system;
 pub mod result;
-pub mod run;
 pub mod settings;
 pub mod sim;
 pub mod two_matrix;
-pub(self) mod utils;
+pub mod utils;
 
 use std::{io::BufReader, path::Path};
+use utils::run;
 
 use result::{Results, SingleResult};
 use serde::Serialize;

@@ -137,7 +137,7 @@ mod tests {
             chip_merger_status_id,
             chip_level_id,
         );
-        let comp_id = comp_time.add_component();
+        let comp_id = comp_time.add_component("13");
         let chip_woker = MergerWorker {
             merger_size: 4,
             merger_status_id: chip_merger_status_id,
@@ -148,12 +148,19 @@ mod tests {
             self_level_id: chip_level_id,
             comp_id,
         };
-        let bank_task_reorder =
-            BankTaskReorder::new(chip_to_bank, bank_to_bank_merger.clone(), 4, ((0, 0), 0),33.);
+        let comp_id = comp_time.add_component("123");
+        let bank_task_reorder = BankTaskReorder::new(
+            chip_to_bank,
+            bank_to_bank_merger.clone(),
+            4,
+            ((0, 0), 0),
+            33.,
+            comp_id,
+        );
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in bank_to_bank_merger {
-                let comp_id = comp_time.add_component();
+                let comp_id = comp_time.add_component("123");
                 let pe_comp = BankPe::new(
                     pe_in,
                     bank_to_chip_partial_return,

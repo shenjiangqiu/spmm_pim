@@ -6,12 +6,15 @@ use clap_complete::Generator;
 use eyre::{Context, Result};
 use itertools::Itertools;
 use log::{debug, error, info};
-use spmm_pim::args::RunMode;
-use spmm_pim::result::save_result_list;
-use spmm_pim::run::run_exp_csr;
-use spmm_pim::run_2d_unroll_buf;
-use spmm_pim::two_matrix::TwoMatrix;
-use spmm_pim::{args::Args, result::Results, settings::Settings};
+
+use spmm_pim::{
+    args::{Args, RunMode},
+    result::{self, Results},
+    run_2d_unroll_buf,
+    settings::Settings,
+    two_matrix::TwoMatrix,
+    utils::run::run_exp_csr,
+};
 use sprs::CsMat;
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
@@ -103,7 +106,8 @@ fn _main(args: Args) -> Result<()> {
             full_result
                 .save_to_file(&file_name)
                 .wrap_err("file to save result")?;
-            save_result_list(&ok_list, &err_list, &file_name).wrap_err("file to save result")?;
+            result::save_result_list(&ok_list, &err_list, &file_name)
+                .wrap_err("file to save result")?;
             info!(
                 "running time: {:?}'s",
                 std::time::Instant::now()

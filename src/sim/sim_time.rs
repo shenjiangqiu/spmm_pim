@@ -13,17 +13,17 @@ use std::cell::UnsafeCell;
 /// - this structure should be instantiated by each component
 #[derive(Default, Debug)]
 pub struct ComponentTime {
-    pub componet_idle_time: UnsafeCell<Vec<Vec<f64>>>,
+    pub componet_idle_time: UnsafeCell<Vec<(String, Vec<f64>)>>,
 }
 impl ComponentTime {
     pub fn new() -> Self {
         Default::default()
     }
     /// # (⸝⸝•‧̫•⸝⸝)
-    pub fn add_component(&self) -> usize {
+    pub fn add_component(&self, name: impl Into<String>) -> usize {
         unsafe {
             let vec = &mut *self.componet_idle_time.get();
-            vec.push(vec![]);
+            vec.push((name.into(), vec![]));
             vec.len() - 1
         }
     }
@@ -31,16 +31,10 @@ impl ComponentTime {
     /// take care! the component_id should be valid that returned by add_component
     /// # Safety
     /// the component_id should be valid
-    pub unsafe fn get_idle_time(&self, component_id: usize) -> &Vec<f64> {
+    pub unsafe fn get_idle_time(&self, component_id: usize) -> &(String, Vec<f64>) {
         (*self.componet_idle_time.get()).get_unchecked(component_id)
     }
-    /// # (,,•́.•̀,,)
-    ///  take care! the component_id should be valid that returned by add_component
-    /// # Safety
-    /// the component_id should be valid
-    pub unsafe fn set_idle_time(&self, component_id: usize, idle_time: Vec<f64>) {
-        *(*self.componet_idle_time.get()).get_unchecked_mut(component_id) = idle_time;
-    }
+
     /// # (Ծ‸Ծ)
     /// take care! the component_id should be valid that returned by add_component
     /// # Safety
@@ -50,6 +44,7 @@ impl ComponentTime {
 
         (*self.componet_idle_time.get())
             .get_unchecked_mut(component_id)
+            .1
             .push(idle_time);
     }
 }
@@ -165,16 +160,16 @@ mod tests {
     #[test]
     fn test_time() {
         let comp_time = ComponentTime::new();
-        let comp1 = comp_time.add_component();
-        let comp2 = comp_time.add_component();
+        let comp1 = comp_time.add_component("comp1".to_string());
+        let comp2 = comp_time.add_component("comp2".to_string());
         unsafe {
             comp_time.add_idle_time(comp1, 1.3);
             comp_time.add_idle_time(comp1, 1.3);
             comp_time.add_idle_time(comp2, 2.3);
         }
         unsafe {
-            assert_eq!(comp_time.get_idle_time(comp1), &vec![1.3, 1.3]);
-            assert_eq!(comp_time.get_idle_time(comp2), &vec![2.3]);
+            assert_eq!(comp_time.get_idle_time(comp1).1, vec![1.3, 1.3]);
+            assert_eq!(comp_time.get_idle_time(comp2).1, vec![2.3]);
         }
     }
 

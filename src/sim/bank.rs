@@ -184,6 +184,8 @@ pub struct BankTaskReorder {
     pub self_id: BankID,
 
     pub bank_change_latency: f64,
+
+    pub comp_id: usize,
 }
 
 impl Component for BankTaskReorder {
@@ -194,11 +196,15 @@ impl Component for BankTaskReorder {
             let mut current_target_pe = 0;
             let mut current_row = 0;
             let (_time, status) = context.into_inner();
+            let mut current_time = 0.;
             loop {
                 // first get the context
                 let context: SpmmContex =
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (time, pop_status) = context.into_inner();
+                let gap = time - current_time;
+
+                current_time = time;
                 debug!(
                     "TASK_REORDER: time: {},received taske: {:?}",
                     time, pop_status
@@ -210,8 +216,13 @@ impl Component for BankTaskReorder {
                     shared_bankpe_status: _,
                     shared_sim_time: _,
                     shared_level_time: _,
-                    shared_comp_time: _,
+                    shared_comp_time,
                 } = pop_status;
+                unsafe {
+                    // safety: the comp_id is set by add_comp, that should be valid!
+                    shared_comp_time.add_idle_time(self.comp_id, gap);
+                }
+
                 let (_resouce_id, task) = state.into_push_bank_task().unwrap();
 
                 match task {
@@ -281,6 +292,7 @@ impl BankTaskReorder {
         total_reorder_size: usize,
         self_id: BankID,
         bank_change_latency: f64,
+        comp_id: usize,
     ) -> Self {
         Self {
             task_in,
@@ -288,6 +300,7 @@ impl BankTaskReorder {
             total_reorder_size,
             self_id,
             bank_change_latency,
+            comp_id,
         }
     }
 }
@@ -344,11 +357,13 @@ mod test {
         };
 
         let partial_return = simulator.create_resource(Box::new(Store::new(16)));
-        let bank_task_reorder = BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0), 33.);
+        let comp_id = shared_comp_time.add_component("123");
+        let bank_task_reorder =
+            BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0), 33., comp_id);
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let comp_id = shared_comp_time.add_component();
+                let comp_id = shared_comp_time.add_component("123");
                 let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in, comp_id);
                 pes.push(pe_comp);
             }
