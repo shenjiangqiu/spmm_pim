@@ -1,9 +1,7 @@
 use eyre::Result;
 use log::debug;
-use spmm_pim::result::save_result_list;
-use spmm_pim::run::run_exp_csr;
-use spmm_pim::run_2d_unroll_buf;
-use spmm_pim::{result::Results, settings::Settings};
+
+use spmm_pim::{run_2d_unroll_buf,utils::run::run_exp_csr,result::{Results,self}, settings::Settings};
 use sprs::CsMat;
 use std::path::{Path, PathBuf};
 
@@ -28,6 +26,6 @@ fn test() -> Result<()> {
         run_2d_unroll_buf!(i; &csr;&settings.mem_settings; full_result;ok_list;err_list; run_exp_csr; (1,1));
     }
     full_result.save_to_file(Path::new("results/result_test.json"))?;
-    save_result_list(&ok_list, &err_list, Path::new("results/result_test.json"))?;
+    result::save_result_list(&ok_list, &err_list, Path::new("results/result_test.json"))?;
     Ok(())
 }
