@@ -282,6 +282,21 @@ impl Simulator {
         let mut dimm_wait_ids = vec![];
         let mut dimm_ret_ids = vec![];
 
+        let mut dimm_send_ids = vec![];
+        let mut dimm_get_ids = vec![];
+        let mut dimm_aqcuire_ids = vec![];
+        let mut dimm_release_ids = vec![];
+
+        let mut channel_send_ids = vec![];
+        let mut channel_get_ids = vec![];
+        let mut channel_aqcuire_ids = vec![];
+        let mut channel_release_ids = vec![];
+
+        let mut chip_send_ids = vec![];
+        let mut chip_get_ids = vec![];
+        let mut chip_aqcuire_ids = vec![];
+        let mut chip_release_ids = vec![];
+
         // the statistics
         let mut comp_ids = BTreeMap::new();
         let mut level_ids = BTreeMap::new();
@@ -338,12 +353,24 @@ impl Simulator {
         )));
         let dimm_id = shared_level_time.add_level();
         level_ids.insert(PureLevelId::Dimm, dimm_id);
+        let get_id = shared_comp_time.add_component("DIMMSENDER_GETID");
+        dimm_get_ids.push(get_id);
+        let send_id = shared_comp_time.add_component("DIMMSENDER_SENDID");
+        dimm_send_ids.push(send_id);
+        let aqcuire = shared_comp_time.add_component("DIMMSENDER_ACQUIREID");
+        dimm_aqcuire_ids.push(aqcuire);
+        let release_id = shared_comp_time.add_component("DIMMSENDER_RELEASEID");
+        dimm_release_ids.push(release_id);
         let dimm = DimmMerger::new(
             task_send_store,
             channel_stores.clone(),
             merger_resouce_id,
             merger_status_id,
             dimm_id,
+            get_id,
+            send_id,
+            aqcuire,
+            release_id,
         );
         let id = sim.create_process(dimm.run());
         sim.schedule_event(0., id, status.clone());
@@ -409,12 +436,28 @@ impl Simulator {
                 )));
                 let level_time_id = shared_level_time.add_level();
                 level_ids.insert(PureLevelId::Channel, channel_id);
+                let get_id = shared_comp_time.add_component(format!("channel-{channel_id}-getid"));
+                channel_get_ids.push(get_id);
+                let send_id =
+                    shared_comp_time.add_component(format!("channel-{channel_id}-sendid"));
+                channel_send_ids.push(send_id);
+                let aqcuire =
+                    shared_comp_time.add_component(format!("channel-{channel_id}-acquireid"));
+                channel_aqcuire_ids.push(aqcuire);
+                let release_id =
+                    shared_comp_time.add_component(format!("channel-{channel_id}-releaseid"));
+                channel_release_ids.push(release_id);
+
                 let channel = ChannelMerger::new(
                     store_id,
                     chip_stores.clone(),
                     merger_resouce_id,
                     merger_status_id,
                     level_time_id,
+                    get_id,
+                    send_id,
+                    aqcuire,
+                    release_id,
                 );
 
                 // create the process
@@ -482,12 +525,29 @@ impl Simulator {
                             .create_merger_status(mem_settings.chip_merger_count);
                         let chip_level_id = shared_level_time.add_level();
                         level_ids.insert(PureLevelId::Chip, chip_level_id);
+
+                        let get_id =
+                            shared_comp_time.add_component(format!("chip-{chip_id:?}-getid"));
+                        chip_get_ids.push(get_id);
+                        let send_id =
+                            shared_comp_time.add_component(format!("chip-{chip_id:?}-sendid"));
+                        chip_send_ids.push(send_id);
+                        let aqcuire =
+                            shared_comp_time.add_component(format!("chip-{chip_id:?}-acquireid"));
+                        chip_aqcuire_ids.push(aqcuire);
+                        let release_id =
+                            shared_comp_time.add_component(format!("chip-{chip_id:?}-releaseid"));
+                        chip_release_ids.push(release_id);
                         let chip = ChipMerger::new(
                             store_id,
                             bank_stores.clone(),
                             merger_resouce_id,
                             merger_status_id,
                             chip_level_id,
+                            get_id,
+                            send_id,
+                            aqcuire,
+                            release_id,
                         );
 
                         // create the process
@@ -681,6 +741,8 @@ impl Simulator {
         info!("bank_ret_idle_raitio: {:?}", raitio);
         all_result.push(raitio);
 
+        let bank_read=todo!();
+        let bank_comp=todo!();
         // ------------end bank, start chip------------------
         // new code for chip idle average:
 
@@ -717,6 +779,58 @@ impl Simulator {
         let raitio = unsafe { calculate_raition_rate(end_time, &dimm_ret_ids, &shared_comp_time) };
         info!("dimm_ret_idle_raitio: {:?}", raitio);
         all_result.push(raitio);
+        // dimm
+        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_get_ids, &shared_comp_time) };
+        info!("dimm_get_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_send_ids, &shared_comp_time) };
+        info!("dimm_send_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio =
+            unsafe { calculate_raition_rate(end_time, &dimm_aqcuire_ids, &shared_comp_time) };
+        info!("dimm_aqcuire_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_release_ids, &shared_comp_time) };
+        info!("dimm_release_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+        // channel
+        let raitio = unsafe { calculate_raition_rate(end_time, &channel_get_ids, &shared_comp_time) };
+        info!("channel_get_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio = unsafe { calculate_raition_rate(end_time, &channel_send_ids, &shared_comp_time) };
+        info!("channel_send_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio =
+            unsafe { calculate_raition_rate(end_time, &channel_aqcuire_ids, &shared_comp_time) };
+        info!("channel_aqcuire_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+        
+        let raitio = unsafe { calculate_raition_rate(end_time, &channel_release_ids, &shared_comp_time) };
+        info!("channel_release_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        // chip
+        let raitio = unsafe { calculate_raition_rate(end_time, &chip_get_ids, &shared_comp_time) };
+        info!("chip_get_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio = unsafe { calculate_raition_rate(end_time, &chip_send_ids, &shared_comp_time) };
+        info!("chip_send_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio = unsafe { calculate_raition_rate(end_time, &chip_aqcuire_ids, &shared_comp_time) };
+        info!("chip_aqcuire_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
+        let raitio = unsafe { calculate_raition_rate(end_time, &chip_release_ids, &shared_comp_time) };
+        info!("chip_release_idle_raitio: {:?}", raitio);
+        all_result.push(raitio);
+
 
         Ok(all_result)
     }

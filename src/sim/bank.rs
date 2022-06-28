@@ -3,7 +3,7 @@ use std::{
     collections::{BTreeMap, VecDeque},
 };
 const BANK_ROW_SIZE: usize = 2048;
-use desim::{ResourceId};
+use desim::ResourceId;
 use log::debug;
 
 use super::{component::Component, BankID, BankTask, SpmmContex, SpmmStatusEnum};
@@ -261,19 +261,25 @@ impl Component for BankTaskReorder {
                             for _i in inner_row_id_start..inner_row_id_end {
                                 // TODO , read the setting
                                 total_waiting += 16.;
-                                yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let context =
+                                    yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let (_time, _status) = context.into_inner();
+                                current_time = _time;
                             }
                         } else {
                             for _i in inner_row_id_start..=inner_row_id_end {
                                 total_waiting += 16.;
-                                yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let context =
+                                    yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let (_time, _status) = context.into_inner();
+                                current_time = _time;
                             }
                         }
 
                         status.shared_sim_time.add_bank_read(total_waiting);
                         current_row = inner_row_id_end;
 
-                        yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                        let context = yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
                             self.task_out[current_target_pe],
                             BankTaskEnum::PushBankTask(BankTask {
                                 from,
@@ -284,14 +290,18 @@ impl Component for BankTaskReorder {
                                 row_size,
                             }),
                         ));
+                        let (_time, _status) = context.into_inner();
+                        current_time = _time;
                     }
                     BankTaskEnum::EndThisTask => {
                         // end this task
                         // push this to current_taget_pe and switch to the next
-                        yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                        let context = yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
                             self.task_out[current_target_pe],
                             BankTaskEnum::EndThisTask,
                         ));
+                        let (_time, _status) = context.into_inner();
+                        current_time = _time;
                         current_target_pe = (current_target_pe + 1) % num_pes;
                     }
                 }

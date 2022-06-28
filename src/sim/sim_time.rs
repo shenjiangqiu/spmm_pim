@@ -126,16 +126,34 @@ impl SharedSimTime {
             inner.bank_read += time;
         }
     }
+    pub fn get_bank_read(&self) -> f64 {
+        unsafe {
+            let inner = &*self.inner.get();
+            inner.bank_read
+        }
+    }
     pub fn add_bank_merge(&self, time: f64) {
         unsafe {
             let mut inner = &mut *self.inner.get();
             inner.bank_merge += time;
         }
     }
+    pub fn get_bank_merge(&self) -> f64 {
+        unsafe {
+            let inner = &*self.inner.get();
+            inner.bank_merge
+        }
+    }
     pub fn add_chip_merge(&self, time: f64) {
         unsafe {
             let mut inner = &mut *self.inner.get();
             inner.chip_merge += time;
+        }
+    }
+    pub fn get_chip_merge(&self) -> f64 {
+        unsafe {
+            let inner = &*self.inner.get();
+            inner.chip_merge
         }
     }
 
@@ -145,11 +163,23 @@ impl SharedSimTime {
             inner.channel_merge += time;
         }
     }
+    pub fn get_channel_merge(&self) -> f64 {
+        unsafe {
+            let inner = &*self.inner.get();
+            inner.channel_merge
+        }
+    }
 
     pub fn add_dimm_merge(&self, time: f64) {
         unsafe {
             let mut inner = &mut *self.inner.get();
             inner.dimm_merge += time;
+        }
+    }
+    pub fn get_dimm_merge(&self) -> f64 {
+        unsafe {
+            let inner = &*self.inner.get();
+            inner.dimm_merge
         }
     }
 }

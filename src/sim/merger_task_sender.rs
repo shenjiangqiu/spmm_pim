@@ -16,6 +16,11 @@ pub trait MergerTaskSender {
     fn get_task_in(&self) -> ResourceId;
     fn get_merger_resouce_id(&self) -> ResourceId;
     fn get_merger_status_id(&self) -> usize;
+
+    fn get_task_get_idle_id(&self) -> usize;
+    fn get_task_send_idle_id(&self) -> usize;
+    fn get_slot_aquer_id(&self) -> usize;
+    fn get_slot_release_id(&self) -> usize;
 }
 #[derive(Debug, Clone, Default)]
 pub struct MergerWorkerStatus {
@@ -132,6 +137,7 @@ where
         Box::new(move |context: SpmmContex| {
             let (_time, status) = context.into_inner();
             let mut first_task = true;
+            let mut current_time = 0.;
             // first get the task
             loop {
                 // step 1: get the finished
@@ -139,6 +145,8 @@ where
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in()));
                 debug!("MERGER_TSK_SD:id:{},{:?}", self.get_task_in(), context);
                 let (_time, task) = context.into_inner();
+                let gap = _time - current_time;
+                current_time = _time;
                 let (_, task, merger_status, _, _, _) = task.into_inner();
                 let task = task.into_push_bank_task().unwrap().1;
                 let status_id = self.get_merger_status_id();
@@ -156,9 +164,13 @@ where
 
                         // first set the status:
                         if first_task {
-                            yield status.clone_with_state(SpmmStatusEnum::Acquire(
+                            let context = yield status.clone_with_state(SpmmStatusEnum::Acquire(
                                 self.get_merger_resouce_id(),
                             ));
+                            let (_time, status) = context.into_inner();
+                            let gap = _time - current_time;
+                            current_time = _time;
+
                             first_task = false;
                         }
                         // then push to target pe
@@ -166,7 +178,7 @@ where
 
                         merger_status.borrow_mut().id_to_mergerstatus[status_id]
                             .push(to, lower_pe_id);
-                        yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                        let context = yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
                             lower_pe_id,
                             BankTaskEnum::PushBankTask(BankTask {
                                 from,
@@ -177,14 +189,21 @@ where
                                 row_size,
                             }),
                         ));
+                        let (_time, status) = context.into_inner();
+                        let gap = _time - current_time;
+                        current_time = _time;
                     }
                     super::BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
                         for lower_pe_id in self.get_lower_pes().iter().cloned().collect_vec() {
-                            yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                                lower_pe_id,
-                                super::BankTaskEnum::EndThisTask,
-                            ));
+                            let context =
+                                yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                    lower_pe_id,
+                                    super::BankTaskEnum::EndThisTask,
+                                ));
+                            let (_time, status) = context.into_inner();
+                            let gap = _time - current_time;
+                            current_time = _time;
                         }
                         first_task = true;
                     }
