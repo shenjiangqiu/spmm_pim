@@ -10,7 +10,6 @@ pub struct MergerWorkerDispatcher {
 
     // the merger status id
     pub merger_status_id: usize,
-    pub self_level_id: usize,
 }
 
 impl Component for MergerWorkerDispatcher {

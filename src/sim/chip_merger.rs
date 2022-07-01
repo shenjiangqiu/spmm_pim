@@ -4,7 +4,7 @@
 
 use desim::ResourceId;
 
-use super::{merger_task_sender::*, BankID};
+use super::{merger_task_sender::*, BankID, sim_time::{NamedTimeId, LevelTimeId}};
 pub struct ChipMerger {
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
@@ -12,12 +12,9 @@ pub struct ChipMerger {
 
     // settings
     pub merger_status_id: usize,
-    pub self_level_time_id: usize,
+    pub self_level_time_id: LevelTimeId,
 
-    pub get_id: usize,
-    pub send_id: usize,
-    pub aquer_id: usize,
-    pub release_id: usize,
+    pub time_id: NamedTimeId,
 }
 
 impl ChipMerger {
@@ -26,11 +23,8 @@ impl ChipMerger {
         lower_pes: Vec<ResourceId>,
         merger_resouce: ResourceId,
         merger_status_id: usize,
-        self_level_time_id: usize,
-        get_id: usize,
-        send_id: usize,
-        aquer_id: usize,
-        release_id: usize,
+        self_level_time_id: LevelTimeId,
+        time_id: NamedTimeId,
     ) -> Self {
         Self {
             task_in,
@@ -38,10 +32,7 @@ impl ChipMerger {
             merger_resouce,
             merger_status_id,
             self_level_time_id,
-            get_id,
-            send_id,
-            aquer_id,
-            release_id,
+            time_id,
         }
     }
 }
@@ -66,20 +57,8 @@ impl MergerTaskSender for ChipMerger {
         &self.lower_pes
     }
 
-    fn get_task_get_idle_id(&self) -> usize {
-        self.get_id
-    }
-
-    fn get_task_send_idle_id(&self) -> usize {
-        self.send_id
-    }
-
-    fn get_slot_aquer_id(&self) -> usize {
-        self.aquer_id
-    }
-
-    fn get_slot_release_id(&self) -> usize {
-        self.release_id
+    fn get_time_id(&self) -> &super::sim_time::NamedTimeId {
+        todo!()
     }
 }
 

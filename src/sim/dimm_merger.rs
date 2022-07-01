@@ -4,7 +4,11 @@
 
 use desim::ResourceId;
 
-use super::{merger_task_sender::*, BankID};
+use super::{
+    merger_task_sender::*,
+    sim_time::{LevelTimeId, NamedTimeId},
+    BankID,
+};
 pub struct DimmMerger {
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
@@ -12,12 +16,9 @@ pub struct DimmMerger {
 
     // settings
     pub merger_status_id: usize,
-    pub self_level_time_id: usize,
 
-    pub get_id: usize,
-    pub send_id: usize,
-    pub aquer_id: usize,
-    pub release_id: usize,
+    // stats ids
+    pub time_id: NamedTimeId,
 }
 
 impl DimmMerger {
@@ -26,22 +27,14 @@ impl DimmMerger {
         lower_pes: Vec<ResourceId>,
         merger_resouce: ResourceId,
         merger_status_id: usize,
-        self_level_time_id: usize,
-        get_id: usize,
-        send_id: usize,
-        aquer_id: usize,
-        release_id: usize,
+        time_id: NamedTimeId,
     ) -> Self {
         Self {
             task_in,
             lower_pes,
             merger_resouce,
             merger_status_id,
-            self_level_time_id,
-            get_id,
-            send_id,
-            aquer_id,
-            release_id,
+            time_id,
         }
     }
 }
@@ -66,19 +59,7 @@ impl MergerTaskSender for DimmMerger {
         &self.lower_pes
     }
 
-    fn get_task_get_idle_id(&self) -> usize {
-        self.get_id
-    }
-
-    fn get_task_send_idle_id(&self) -> usize {
-        self.send_id
-    }
-
-    fn get_slot_aquer_id(&self) -> usize {
-        self.aquer_id
-    }
-
-    fn get_slot_release_id(&self) -> usize {
-        self.release_id
+    fn get_time_id(&self) -> &NamedTimeId {
+        &self.time_id
     }
 }

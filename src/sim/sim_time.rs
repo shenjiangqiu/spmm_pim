@@ -7,7 +7,91 @@
 //! - the unbanlence of each row
 //!   - get every level's max time and min time
 
-use std::cell::UnsafeCell;
+use std::{cell::UnsafeCell, collections::BTreeMap};
+
+/// the time statistics of all components
+///
+/// in this struct, a vec of `NamedTime` is stored. each `NamedTime` is a component's time statistics.
+/// to add a new component to this struct, you can use the `add_component` method.
+/// and later to update the time statistics of a component, you can use the `add_idle_time` method.
+///
+/// ## Safety
+/// it use UnsafeCell to store the time statistics of each component in order to make it shared by all components immutably.
+/// see the unsafe block in the functions for more information.
+#[derive(Default, Debug)]
+pub struct SharedNamedTime {
+    data: UnsafeCell<Vec<(String, NamedTime)>>,
+}
+
+/// the id to identify a component, use this instead of usize to prevent using arbitrary id or id created by other StaticSimTime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NamedTimeId {
+    inner: usize,
+}
+
+impl SharedNamedTime {
+    pub fn new() -> Self {
+        SharedNamedTime {
+            data: UnsafeCell::new(Vec::new()),
+        }
+    }
+
+    /// ## return
+    ///- the id of the named time(for a new component)
+    /// ## description
+    ///- the id should be used to add idle time later in the component by using `add_idle_time`
+    pub fn add_component(&self) -> NamedTimeId {
+        let default_name = "default".to_string();
+        self.add_component_with_name(default_name)
+    }
+
+    pub fn add_component_with_name(&self, name: impl Into<String>) -> NamedTimeId {
+        unsafe {
+            let data = &mut *self.data.get();
+            data.push((name.into(), NamedTime::new()));
+            NamedTimeId {
+                inner: data.len() - 1,
+            }
+        }
+    }
+
+    /// ## Safety
+    ///-  the id should be **valid**( which should be created by `add_component`)
+    /// ## Parameters
+    ///- `id`: the id of the component in the array
+    ///- `name`: the name of idle time that need to be added
+    ///- `idle_time`: the idle time need to be added to the old one
+    pub unsafe fn add_idle_time(&self, id: NamedTimeId, name: &str, idle_time: f64) {
+        let data = &mut *self.data.get();
+        data.get_unchecked_mut(id.inner)
+            .1
+            .add_idle_time(name, idle_time);
+    }
+}
+
+/// a dynamic time statistics of a component
+/// - it have multiple fields of idle times, which stored in a map indexed by a name.
+/// ## usage
+/// - you don't need to create a entry, just use `add_idle_time` to add a idle time. if it's the first time to add a idle time, it will create a new entry.
+#[derive(Default, Debug)]
+struct NamedTime {
+    data: BTreeMap<String, f64>,
+}
+impl NamedTime {
+    fn new() -> Self {
+        NamedTime {
+            data: BTreeMap::new(),
+        }
+    }
+    fn add_idle_time(&mut self, name: &str, idle_time: f64) {
+        // if contains the name, add the time, else create a new one
+        if let Some(time) = self.data.get_mut(name) {
+            *time += idle_time;
+        } else {
+            self.data.insert(name.to_string(), idle_time);
+        }
+    }
+}
 
 /// # ( Ꙭ) this component contains the idle time of each component
 /// - this structure should be instantiated by each component
@@ -57,15 +141,24 @@ pub struct LevelTime {
     // (f64,f64) means finished time and gap between finished time and first coming time
     pub level_finished_time: UnsafeCell<Vec<Vec<(f64, f64)>>>,
 }
+
+/// levelTimeId is used to identify a level, use this instead of usize to prevent using arbitrary id or id created by other StaticSimTime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LevelTimeId {
+    inner: usize,
+}
+
 impl LevelTime {
     pub fn new() -> Self {
         Default::default()
     }
-    pub fn add_level(&self) -> usize {
+    pub fn add_level(&self) -> LevelTimeId {
         unsafe {
             let vec = &mut *self.level_finished_time.get();
             vec.push(vec![]);
-            vec.len() - 1
+            LevelTimeId {
+                inner: vec.len() - 1,
+            }
         }
     }
     /// # ( ´◔ ‸◔`)
@@ -74,8 +167,8 @@ impl LevelTime {
     /// the level_id should be valid
     /// -  return
     ///  the (finished time, gap time) of all target rows of this level
-    pub unsafe fn get_finished_time(&self, level_id: usize) -> &Vec<(f64, f64)> {
-        (*self.level_finished_time.get()).get_unchecked(level_id)
+    pub unsafe fn get_finished_time(&self, level_id: LevelTimeId) -> &Vec<(f64, f64)> {
+        (*self.level_finished_time.get()).get_unchecked(level_id.inner)
     }
     /// # (˶˚ ᗨ ˚˶)
     /// take care! the level_id should be valid that returned by add_level
@@ -83,8 +176,8 @@ impl LevelTime {
     /// the level_id should be valid
     /// # args
     /// - time: the vec of (finished time, gap time)
-    pub unsafe fn set_finished_time(&self, level_id: usize, time: Vec<(f64, f64)>) {
-        *(*self.level_finished_time.get()).get_unchecked_mut(level_id) = time;
+    pub unsafe fn set_finished_time(&self, level_id: LevelTimeId, time: Vec<(f64, f64)>) {
+        *(*self.level_finished_time.get()).get_unchecked_mut(level_id.inner) = time;
     }
     /// # (｡•ᴗ-)_
     /// take care! the level_id should be valid that returned by add_level
@@ -92,11 +185,11 @@ impl LevelTime {
     /// the level_id should be valid
     /// # args:
     /// - time: the (finished time, gap time)
-    pub unsafe fn add_finished_time(&self, level_id: usize, time: (f64, f64)) {
+    pub unsafe fn add_finished_time(&self, level_id: LevelTimeId, time: (f64, f64)) {
         // add the idle time to current idle time
 
         (*self.level_finished_time.get())
-            .get_unchecked_mut(level_id)
+            .get_unchecked_mut(level_id.inner)
             .push(time);
     }
 }

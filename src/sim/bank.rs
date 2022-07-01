@@ -6,11 +6,14 @@ const BANK_ROW_SIZE: usize = 2048;
 use desim::ResourceId;
 use log::debug;
 
-use super::{component::Component, BankID, BankTask, SpmmContex, SpmmStatusEnum};
+use super::{
+    component::Component, sim_time::NamedTimeId, BankID, BankTask, SpmmContex, SpmmStatusEnum,
+};
 use crate::{
     pim::merge_rows_into_one,
     sim::{BankTaskEnum, SpmmStatus},
 };
+//849191287
 
 /// merger status
 /// - total_merger: number of total merger workers
@@ -90,8 +93,8 @@ pub struct BankPe {
 
     // just for record
     pub task_sender_input_id: ResourceId,
-    pub comp_id: usize,
-    pub return_idle_id: usize,
+
+    pub named_idle_time_id: NamedTimeId,
 }
 
 impl BankPe {
@@ -100,10 +103,8 @@ impl BankPe {
         partial_out: ResourceId,
         merger_size: usize,
         adder_size: usize,
-
         task_sender_input_id: ResourceId,
-        comp_id: usize,
-        return_idle_id: usize,
+        named_idle_time_id: NamedTimeId,
     ) -> Self {
         Self {
             task_in,
@@ -111,8 +112,7 @@ impl BankPe {
             merger_size,
             adder_size,
             task_sender_input_id,
-            comp_id,
-            return_idle_id,
+            named_idle_time_id,
         }
     }
 }
@@ -147,7 +147,7 @@ impl Component for BankPe {
                 } = pop_status;
                 let (_resouce_id, bank_task) = state.into_push_bank_task().unwrap();
                 unsafe {
-                    shared_comp_time.add_idle_time(self.comp_id, gap);
+                    shared_comp_time.add_idle_time(self.named_idle_time_id, "get_task", gap);
                 }
                 match bank_task {
                     BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
@@ -178,7 +178,11 @@ impl Component for BankPe {
                             let return_gap = _time - current_time;
                             current_time = _time;
                             unsafe {
-                                shared_comp_time.add_idle_time(self.return_idle_id, return_gap);
+                                shared_comp_time.add_idle_time(
+                                    self.named_idle_time_id,
+                                    "return_to_chip",
+                                    return_gap,
+                                );
                             }
                         }
 
@@ -200,7 +204,7 @@ pub struct BankTaskReorder {
 
     pub bank_change_latency: f64,
 
-    pub comp_id: usize,
+    pub comp_id: NamedTimeId,
 }
 
 impl Component for BankTaskReorder {
@@ -235,7 +239,7 @@ impl Component for BankTaskReorder {
                 } = pop_status;
                 unsafe {
                     // safety: the comp_id is set by add_comp, that should be valid!
-                    shared_comp_time.add_idle_time(self.comp_id, gap);
+                    shared_comp_time.add_idle_time(self.comp_id, "get_task_from_chip", gap);
                 }
 
                 let (_resouce_id, task) = state.into_push_bank_task().unwrap();
@@ -317,7 +321,7 @@ impl BankTaskReorder {
         total_reorder_size: usize,
         self_id: BankID,
         bank_change_latency: f64,
-        comp_id: usize,
+        comp_id: NamedTimeId,
     ) -> Self {
         Self {
             task_in,
@@ -340,7 +344,7 @@ mod test {
         sim::{
             final_receiver::FinalReceiver,
             merger_task_sender::FullMergerStatus,
-            sim_time::{ComponentTime, LevelTime, SharedSimTime},
+            sim_time::{ComponentTime, LevelTime, SharedNamedTime, SharedSimTime},
             task_sender::TaskSender,
             SpmmStatus,
         },
@@ -354,7 +358,7 @@ mod test {
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
         let shared_level_time: Rc<LevelTime> = Rc::new(Default::default());
-        let shared_comp_time: Rc<ComponentTime> = Rc::new(Default::default());
+        let shared_comp_time: Rc<SharedNamedTime> = Rc::new(Default::default());
         let status = SpmmStatus::new(
             SpmmStatusEnum::Continue,
             Rc::new(RefCell::new(FullMergerStatus::new())),
@@ -382,23 +386,15 @@ mod test {
         };
 
         let partial_return = simulator.create_resource(Box::new(Store::new(16)));
-        let comp_id = shared_comp_time.add_component("123");
+        let comp_id = shared_comp_time.add_component_with_name("123");
         let bank_task_reorder =
             BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0), 33., comp_id);
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let comp_id = shared_comp_time.add_component("123");
-                let retrun_idle_id = shared_comp_time.add_component("123");
-                let pe_comp = BankPe::new(
-                    pe_in,
-                    partial_return,
-                    4,
-                    4,
-                    task_in,
-                    comp_id,
-                    retrun_idle_id,
-                );
+                let comp_id = shared_comp_time.add_component_with_name("123");
+                let retrun_idle_id = shared_comp_time.add_component_with_name("123");
+                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in, comp_id);
                 pes.push(pe_comp);
             }
             pes

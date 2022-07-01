@@ -1,7 +1,11 @@
 use desim::ResourceId;
 use log::debug;
 
-use super::{component::Component, SpmmContex, SpmmStatusEnum};
+use super::{
+    component::Component,
+    sim_time::{LevelTimeId, NamedTimeId},
+    SpmmContex, SpmmStatusEnum,
+};
 
 /// - `MergerWorker`: this is the worker for each level, there should be multile instance for each level!
 pub struct MergerWorker {
@@ -10,12 +14,11 @@ pub struct MergerWorker {
     pub merger_work_resource: ResourceId,
     pub merger_status_id: usize,
     pub merger_size: usize,
+    pub task_sender_input_id: usize,
 
     // just recording, not for use to send data
-    pub task_sender_input_id: ResourceId,
-    pub self_level_id: usize,
-    pub comp_id: usize,
-    pub return_idle_id: usize,
+    pub level_time: LevelTimeId,
+    pub time_id: NamedTimeId,
 }
 
 impl Component for MergerWorker {
@@ -44,7 +47,7 @@ impl Component for MergerWorker {
                     pop_status.into_inner();
                 unsafe {
                     // Safety: the comp_id is valid!
-                    comp_time.add_idle_time(self.comp_id, idle_time);
+                    comp_time.add_idle_time(self.time_id, "wait_task", idle_time);
                 }
                 let (_resouce_id, (target_row, task_in_id, target_result)) =
                     state.into_push_partial_task().unwrap();
@@ -66,7 +69,7 @@ impl Component for MergerWorker {
                     // wait time in max(add_time, merge_time)
                     let wait_time = std::cmp::max(add_time, merge_time) as f64;
                     unsafe {
-                        level_time.add_finished_time(self.self_level_id, (wait_time, gap));
+                        level_time.add_finished_time(self.level_time, (wait_time, gap));
                     }
                     let context = yield status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
                     let (_time, _wait_status) = context.into_inner();
@@ -79,7 +82,7 @@ impl Component for MergerWorker {
                     let (_time, _push_status) = context.into_inner();
                     let return_idle_time = _time - current_time;
                     unsafe {
-                        comp_time.add_idle_time(self.return_idle_id, return_idle_time);
+                        comp_time.add_idle_time(self.time_id, "push_partial", return_idle_time);
                     }
                     current_time = _time;
 

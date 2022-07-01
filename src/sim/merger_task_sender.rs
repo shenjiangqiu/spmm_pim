@@ -5,7 +5,8 @@ use itertools::Itertools;
 use log::debug;
 
 use super::{
-    component::Component, BankID, BankTask, BankTaskEnum, SpmmContex, SpmmStatus, SpmmStatusEnum,
+    component::Component, sim_time::NamedTimeId, BankID, BankTask, BankTaskEnum, SpmmContex,
+    SpmmStatus, SpmmStatusEnum,
 };
 
 pub trait MergerTaskSender {
@@ -17,10 +18,7 @@ pub trait MergerTaskSender {
     fn get_merger_resouce_id(&self) -> ResourceId;
     fn get_merger_status_id(&self) -> usize;
 
-    fn get_task_get_idle_id(&self) -> usize;
-    fn get_task_send_idle_id(&self) -> usize;
-    fn get_slot_aquer_id(&self) -> usize;
-    fn get_slot_release_id(&self) -> usize;
+    fn get_time_id(&self) -> &NamedTimeId;
 }
 #[derive(Debug, Clone, Default)]
 pub struct MergerWorkerStatus {
@@ -147,7 +145,10 @@ where
                 let (_time, task) = context.into_inner();
                 let gap = _time - current_time;
                 current_time = _time;
-                let (_, task, merger_status, _, _, _) = task.into_inner();
+                let (_, task, merger_status, _, _, named_time) = task.into_inner();
+                unsafe {
+                    named_time.add_idle_time(*self.get_time_id(), "get_task", gap);
+                }
                 let task = task.into_push_bank_task().unwrap().1;
                 let status_id = self.get_merger_status_id();
 
@@ -167,10 +168,16 @@ where
                             let context = yield status.clone_with_state(SpmmStatusEnum::Acquire(
                                 self.get_merger_resouce_id(),
                             ));
-                            let (_time, status) = context.into_inner();
+                            let (_time, _status) = context.into_inner();
                             let gap = _time - current_time;
                             current_time = _time;
-
+                            unsafe {
+                                named_time.add_idle_time(
+                                    *self.get_time_id(),
+                                    "acquire_merger_resource",
+                                    gap,
+                                );
+                            }
                             first_task = false;
                         }
                         // then push to target pe
@@ -189,9 +196,13 @@ where
                                 row_size,
                             }),
                         ));
-                        let (_time, status) = context.into_inner();
+                        let (_time, _status) = context.into_inner();
                         let gap = _time - current_time;
                         current_time = _time;
+
+                        unsafe {
+                            named_time.add_idle_time(*self.get_time_id(), "push_bank_task", gap);
+                        }
                     }
                     super::BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
@@ -201,9 +212,16 @@ where
                                     lower_pe_id,
                                     super::BankTaskEnum::EndThisTask,
                                 ));
-                            let (_time, status) = context.into_inner();
+                            let (_time, _status) = context.into_inner();
                             let gap = _time - current_time;
                             current_time = _time;
+                            unsafe {
+                                named_time.add_idle_time(
+                                    *self.get_time_id(),
+                                    "push_end_bank_task",
+                                    gap,
+                                );
+                            }
                         }
                         first_task = true;
                     }

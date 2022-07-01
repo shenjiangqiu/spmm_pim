@@ -34,7 +34,9 @@ use self::{
     merger_task_dispather::MergerWorkerDispatcher,
     merger_task_sender::FullMergerStatus,
     merger_task_worker::MergerWorker,
-    sim_time::{ComponentTime, LevelTime, SharedSimTime},
+    sim_time::{
+        ComponentTime, LevelTime, LevelTimeId, NamedTimeId, SharedNamedTime, SharedSimTime,
+    },
     task_sender::TaskSender,
 };
 use crate::{csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix};
@@ -89,7 +91,7 @@ pub struct SpmmStatus {
     pub shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
     pub shared_sim_time: Rc<SharedSimTime>,
     pub shared_level_time: Rc<LevelTime>,
-    pub shared_comp_time: Rc<ComponentTime>,
+    pub shared_comp_time: Rc<SharedNamedTime>,
 }
 impl CopyDefault for SpmmStatus {
     fn copy_default(&self) -> Self {
@@ -118,7 +120,7 @@ type StatusTuple = (
     Rc<RefCell<merger_task_sender::FullMergerStatus>>,
     Rc<RefCell<BTreeMap<PeID, usize>>>,
     Rc<LevelTime>,
-    Rc<ComponentTime>,
+    Rc<SharedNamedTime>,
 );
 
 impl SpmmStatus {
@@ -128,7 +130,7 @@ impl SpmmStatus {
         shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
         shared_sim_time: Rc<SharedSimTime>,
         shared_level_time: Rc<LevelTime>,
-        shared_comp_time: Rc<ComponentTime>,
+        shared_comp_time: Rc<SharedNamedTime>,
     ) -> Self {
         Self {
             state,
@@ -166,7 +168,7 @@ impl SpmmStatus {
         shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
         shared_sim_time: Rc<SharedSimTime>,
         shared_level_time: Rc<LevelTime>,
-        shared_comp_time: Rc<ComponentTime>,
+        shared_comp_time: Rc<SharedNamedTime>,
     ) -> Self {
         Self {
             state,
@@ -265,6 +267,319 @@ unsafe fn calculate_raition_rate(
     idle_time / total_time
 }
 
+fn build_dimm(
+    mem_settings: &MemSettings,
+    store_size: usize,
+    merger_status: Rc<RefCell<FullMergerStatus>>,
+    sim: &mut Simulation<SpmmStatus>,
+    shared_comp_time: Rc<SharedNamedTime>,
+    task_send_store: usize,
+    status: SpmmStatus,
+    final_receiver_resouce: usize,
+    dimm_level_id: LevelTimeId,
+    channel_level_id: LevelTimeId,
+    chip_level_id: LevelTimeId,
+    bank_level_id: LevelTimeId,
+) -> eyre::Result<()> {
+    // 2. add the Dimm
+    let num_channels = mem_settings.channels;
+    let channel_stores = (0..num_channels)
+        .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
+        .collect_vec();
+    let merger_status_id = merger_status
+        .borrow_mut()
+        .create_merger_status(mem_settings.dimm_merger_count);
+    let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
+        mem_settings.dimm_merger_count,
+    )));
+    let sim_time_id = shared_comp_time.add_component_with_name("DIMMSENDER_GETID");
+
+    let dimm = DimmMerger::new(
+        task_send_store,
+        channel_stores.clone(),
+        merger_resouce_id,
+        merger_status_id,
+        sim_time_id,
+    );
+    let id = sim.create_process(dimm.run());
+    sim.schedule_event(0., id, status.clone());
+
+    // create the merger_task_worker
+    let mut task_receiver = vec![];
+    for i in 0..mem_settings.dimm_merger_count {
+        let resouce = sim.create_resource(Box::new(Store::new(store_size)));
+        let comp_id = shared_comp_time.add_component_with_name(format!("dimm-{i}"));
+
+        let merger_task_worker = MergerWorker {
+            merger_size: mem_settings.dimm_merger_size,
+            merger_status_id,
+            merger_work_resource: merger_resouce_id,
+            partial_sum_sender: final_receiver_resouce,
+            task_reciever: resouce,
+            task_sender_input_id: task_send_store,
+            level_time: dimm_level_id,
+            time_id: comp_id,
+        };
+        let id = sim.create_process(merger_task_worker.run());
+        sim.schedule_event(0., id, status.clone());
+        task_receiver.push(resouce);
+    }
+
+    // create the dimm merger_task_dispatcher
+    let dimm_merger_worker_task_in = sim.create_resource(Box::new(Store::new(store_size)));
+    let merger_task_dispatcher = MergerWorkerDispatcher {
+        merger_status_id,
+        merger_task_sender: task_receiver,
+        partial_sum_task_in: dimm_merger_worker_task_in,
+    };
+
+    let id = sim.create_process(merger_task_dispatcher.run());
+    sim.schedule_event(0., id, status.clone());
+
+    build_channel(
+        mem_settings,
+        merger_status,
+        sim,
+        shared_comp_time,
+        status,
+        store_size,
+        channel_level_id,
+        chip_level_id,
+        bank_level_id,
+        channel_stores,
+        dimm_merger_worker_task_in,
+    )?;
+    Ok(())
+}
+fn build_channel(
+    mem_settings: &MemSettings,
+    merger_status: Rc<RefCell<FullMergerStatus>>,
+    sim: &mut Simulation<SpmmStatus>,
+    shared_comp_time: Rc<SharedNamedTime>,
+    status: SpmmStatus,
+    store_size: usize,
+    channel_level_id: LevelTimeId,
+    chip_level_id: LevelTimeId,
+    bank_level_id: LevelTimeId,
+    channel_stores: Vec<usize>,
+    dimm_in: usize,
+) -> eyre::Result<()> {
+    // 3. add the Channel
+    for (channel_id, store_id) in channel_stores.into_iter().enumerate() {
+        // create the channel!
+        let num_chips = mem_settings.chips;
+        let chip_stores = (0..num_chips)
+            .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
+            .collect_vec();
+        let merger_status_id = merger_status
+            .borrow_mut()
+            .create_merger_status(mem_settings.channel_merger_count);
+        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
+            mem_settings.channel_merger_count,
+        )));
+
+        let sim_time = shared_comp_time.add_component_with_name("channel_sender");
+
+        let channel = ChannelMerger::new(
+            store_id,
+            chip_stores.clone(),
+            merger_resouce_id,
+            merger_status_id,
+            channel_level_id,
+            sim_time,
+        );
+
+        // create the process
+        let id = sim.create_process(channel.run());
+        sim.schedule_event(0., id, status.clone());
+
+        // create the merger_task_worker
+        let mut task_receiver = vec![];
+        for i in 0..mem_settings.channel_merger_count {
+            let resouce = sim.create_resource(Box::new(Store::new(store_size)));
+            let comp_id = shared_comp_time.add_component_with_name("channel_worker");
+
+            let merger_task_worker = MergerWorker {
+                merger_size: mem_settings.channel_merger_size,
+                merger_status_id,
+                merger_work_resource: merger_resouce_id,
+                partial_sum_sender: dimm_in,
+                task_reciever: resouce,
+                task_sender_input_id: store_id,
+                level_time: channel_level_id,
+                time_id: comp_id,
+            };
+            let id = sim.create_process(merger_task_worker.run());
+            sim.schedule_event(0., id, status.clone());
+            task_receiver.push(resouce);
+        }
+        // create the channel merger_task_dispatcher
+        let channel_merger_worker_task_in = sim.create_resource(Box::new(Store::new(store_size)));
+        let merger_task_dispatcher = MergerWorkerDispatcher {
+            merger_status_id,
+            merger_task_sender: task_receiver,
+            partial_sum_task_in: channel_merger_worker_task_in,
+        };
+        let id = sim.create_process(merger_task_dispatcher.run());
+        sim.schedule_event(0., id, status.clone());
+        build_chip(
+            mem_settings,
+            merger_status.clone(),
+            sim,
+            shared_comp_time.clone(),
+            status.clone(),
+            store_size,
+            chip_level_id,
+            bank_level_id,
+            chip_stores,
+            channel_merger_worker_task_in,
+            channel_id,
+        )?;
+    }
+    Ok(())
+}
+fn build_chip(
+    mem_settings: &MemSettings,
+    merger_status: Rc<RefCell<FullMergerStatus>>,
+    sim: &mut Simulation<SpmmStatus>,
+    shared_comp_time: Rc<SharedNamedTime>,
+    status: SpmmStatus,
+    store_size: usize,
+    chip_level_id: LevelTimeId,
+    bank_level_id: LevelTimeId,
+    chip_stores: Vec<usize>,
+    channel_in: usize,
+    channel_id: ChannelID,
+) -> eyre::Result<()> {
+    // 4. add the chip
+    for (chip_id, store_id) in chip_stores.into_iter().enumerate() {
+        // create the chip!
+        let chip_id = (channel_id, chip_id);
+        let num_banks = mem_settings.banks;
+        let bank_stores = (0..num_banks)
+            .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
+            .collect_vec();
+        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
+            mem_settings.chip_merger_count,
+        )));
+        let merger_status_id = merger_status
+            .borrow_mut()
+            .create_merger_status(mem_settings.chip_merger_count);
+        let sim_time_id = shared_comp_time.add_component_with_name("chip_sender");
+        let chip = ChipMerger::new(
+            store_id,
+            bank_stores.clone(),
+            merger_resouce_id,
+            merger_status_id,
+            chip_level_id,
+            sim_time_id,
+        );
+
+        // create the process
+        let id = sim.create_process(chip.run());
+        sim.schedule_event(0., id, status.clone());
+
+        // create the merger_task_worker
+        let mut task_receiver = vec![];
+        for _i in 0..mem_settings.chip_merger_count {
+            let resouce = sim.create_resource(Box::new(Store::new(store_size)));
+            let comp_id = shared_comp_time.add_component_with_name("chip_worker");
+
+            let merger_task_worker = MergerWorker {
+                merger_size: mem_settings.chip_merger_size,
+                merger_status_id,
+                merger_work_resource: merger_resouce_id,
+                partial_sum_sender: channel_in,
+                task_reciever: resouce,
+                task_sender_input_id: store_id,
+                level_time: chip_level_id,
+                time_id: comp_id,
+            };
+            let id = sim.create_process(merger_task_worker.run());
+            sim.schedule_event(0., id, status.clone());
+            task_receiver.push(resouce);
+        }
+        // create the chip merger_task_dispatcher
+        let chip_merger_worker_task_in = sim.create_resource(Box::new(Store::new(store_size)));
+        let merger_task_dispatcher = MergerWorkerDispatcher {
+            merger_status_id,
+            merger_task_sender: task_receiver,
+            partial_sum_task_in: chip_merger_worker_task_in,
+        };
+        let id = sim.create_process(merger_task_dispatcher.run());
+        sim.schedule_event(0., id, status.clone());
+
+        build_bank(
+            mem_settings,
+            sim,
+            shared_comp_time.clone(),
+            status.clone(),
+            store_size,
+            bank_level_id,
+            bank_stores,
+            chip_merger_worker_task_in,
+            chip_id,
+        )?;
+    }
+    // start
+
+    Ok(())
+    // what we should to output?
+}
+
+fn build_bank(
+    mem_settings: &MemSettings,
+    sim: &mut Simulation<SpmmStatus>,
+    shared_comp_time: Rc<SharedNamedTime>,
+    status: SpmmStatus,
+    store_size: usize,
+    _bank_level_id: LevelTimeId,
+    bank_stores: Vec<usize>,
+    chip_in: usize,
+    chip_id: ChipID,
+) -> eyre::Result<()> {
+    // 5. add the bank
+    for (bank_id, store_id) in bank_stores.into_iter().enumerate() {
+        // create the bank!
+        let bank_id = (chip_id, bank_id);
+
+        let bank_pe_stores = (0..mem_settings.bank_merger_count)
+            .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
+            .collect_vec();
+
+        let comp_id = shared_comp_time.add_component_with_name("bank_sender");
+        let bank = BankTaskReorder::new(
+            store_id,
+            bank_pe_stores.clone(),
+            mem_settings.reorder_count,
+            bank_id,
+            mem_settings.row_change_latency as f64,
+            comp_id,
+        );
+
+        // create the process
+        let id = sim.create_process(bank.run());
+        sim.schedule_event(0., id, status.clone());
+
+        for bank_pe_store_id in bank_pe_stores {
+            let comp_id = shared_comp_time.add_component_with_name("33");
+
+            let bank_pe = BankPe::new(
+                bank_pe_store_id,
+                chip_in,
+                mem_settings.bank_merger_size,
+                mem_settings.bank_adder_size,
+                store_id,
+                comp_id,
+            );
+            let id = sim.create_process(bank_pe.run());
+            sim.schedule_event(0., id, status.clone());
+        }
+    }
+
+    Ok(())
+}
+
 pub struct Simulator {}
 impl Simulator {
     pub fn run(
@@ -273,33 +588,8 @@ impl Simulator {
     ) -> Result<Vec<f64>, eyre::Report> {
         let store_size = mem_settings.store_size;
         // now we need a stucture to map the sim_time id to the real component time
-        let mut bank_wait_ids = vec![];
-        let mut bank_ret_ids = vec![];
-        let mut chip_wait_ids = vec![];
-        let mut chip_ret_ids = vec![];
-        let mut channel_wait_ids = vec![];
-        let mut channel_ret_ids = vec![];
-        let mut dimm_wait_ids = vec![];
-        let mut dimm_ret_ids = vec![];
-
-        let mut dimm_send_ids = vec![];
-        let mut dimm_get_ids = vec![];
-        let mut dimm_aqcuire_ids = vec![];
-        let mut dimm_release_ids = vec![];
-
-        let mut channel_send_ids = vec![];
-        let mut channel_get_ids = vec![];
-        let mut channel_aqcuire_ids = vec![];
-        let mut channel_release_ids = vec![];
-
-        let mut chip_send_ids = vec![];
-        let mut chip_get_ids = vec![];
-        let mut chip_aqcuire_ids = vec![];
-        let mut chip_release_ids = vec![];
 
         // the statistics
-        let mut comp_ids = BTreeMap::new();
-        let mut level_ids = BTreeMap::new();
 
         // 1.---- the basic data
         debug!("start to run");
@@ -307,7 +597,13 @@ impl Simulator {
         let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
         let bankpe_status = Rc::new(RefCell::new(BTreeMap::new()));
         let shared_level_time = Rc::new(LevelTime::new());
-        let shared_comp_time = Rc::new(ComponentTime::new());
+
+        let dimm_level_id = shared_level_time.add_level();
+        let channel_level_id = shared_level_time.add_level();
+        let chip_level_id = shared_level_time.add_level();
+        let bank_level_id = shared_level_time.add_level();
+
+        let shared_comp_time = Rc::new(SharedNamedTime::new());
 
         let sim_time = Rc::new(SharedSimTime::new());
         let status = SpmmStatus::new(
@@ -315,7 +611,7 @@ impl Simulator {
             merger_status.clone(),
             bankpe_status,
             sim_time,
-            shared_level_time.clone(),
+            shared_level_time,
             shared_comp_time.clone(),
         );
 
@@ -339,500 +635,22 @@ impl Simulator {
         );
         let id = sim.create_process(task_sender.run());
         sim.schedule_event(0., id, status.clone());
-
-        // 2. add the Dimm
-        let num_channels = mem_settings.channels;
-        let channel_stores = (0..num_channels)
-            .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
-            .collect_vec();
-        let merger_status_id = merger_status
-            .borrow_mut()
-            .create_merger_status(mem_settings.dimm_merger_count);
-        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
-            mem_settings.dimm_merger_count,
-        )));
-        let dimm_id = shared_level_time.add_level();
-        level_ids.insert(PureLevelId::Dimm, dimm_id);
-        let get_id = shared_comp_time.add_component("DIMMSENDER_GETID");
-        dimm_get_ids.push(get_id);
-        let send_id = shared_comp_time.add_component("DIMMSENDER_SENDID");
-        dimm_send_ids.push(send_id);
-        let aqcuire = shared_comp_time.add_component("DIMMSENDER_ACQUIREID");
-        dimm_aqcuire_ids.push(aqcuire);
-        let release_id = shared_comp_time.add_component("DIMMSENDER_RELEASEID");
-        dimm_release_ids.push(release_id);
-        let dimm = DimmMerger::new(
+        build_dimm(
+            mem_settings,
+            store_size,
+            merger_status,
+            &mut sim,
+            shared_comp_time,
             task_send_store,
-            channel_stores.clone(),
-            merger_resouce_id,
-            merger_status_id,
-            dimm_id,
-            get_id,
-            send_id,
-            aqcuire,
-            release_id,
-        );
-        let id = sim.create_process(dimm.run());
-        sim.schedule_event(0., id, status.clone());
-
-        // create the merger_task_worker
-        let mut task_receiver = vec![];
-        for i in 0..mem_settings.dimm_merger_count {
-            let resouce = sim.create_resource(Box::new(Store::new(store_size)));
-            let comp_id = shared_comp_time.add_component(format!("dimm-{i}"));
-            let return_idle_id = shared_comp_time.add_component(format!("dimm-{i}"));
-            dimm_wait_ids.push(comp_id);
-            dimm_ret_ids.push(return_idle_id);
-            comp_ids.insert(
-                MergerId {
-                    level_id: LevelId::Dimm,
-                    id: i,
-                },
-                comp_id,
-            );
-            let merger_task_worker = MergerWorker {
-                merger_size: mem_settings.dimm_merger_size,
-                merger_status_id,
-                merger_work_resource: merger_resouce_id,
-                partial_sum_sender: final_receiver_resouce,
-                task_reciever: resouce,
-                task_sender_input_id: task_send_store,
-                self_level_id: dimm_id,
-                comp_id,
-                return_idle_id,
-            };
-            let id = sim.create_process(merger_task_worker.run());
-            sim.schedule_event(0., id, status.clone());
-            task_receiver.push(resouce);
-        }
-
-        // create the dimm merger_task_dispatcher
-        let dimm_merger_worker_task_in = sim.create_resource(Box::new(Store::new(store_size)));
-        let merger_task_dispatcher = MergerWorkerDispatcher {
-            merger_status_id,
-            merger_task_sender: task_receiver,
-            partial_sum_task_in: dimm_merger_worker_task_in,
-            self_level_id: dimm_id,
-        };
-
-        let id = sim.create_process(merger_task_dispatcher.run());
-        sim.schedule_event(0., id, status.clone());
-
-        // 3. add the Channel
-        channel_stores
-            .into_iter()
-            .enumerate()
-            .for_each(|(channel_id, store_id)| {
-                // create the channel!
-                let num_chips = mem_settings.chips;
-                let chip_stores = (0..num_chips)
-                    .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
-                    .collect_vec();
-                let merger_status_id = merger_status
-                    .borrow_mut()
-                    .create_merger_status(mem_settings.channel_merger_count);
-                let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
-                    mem_settings.channel_merger_count,
-                )));
-                let level_time_id = shared_level_time.add_level();
-                level_ids.insert(PureLevelId::Channel, channel_id);
-                let get_id = shared_comp_time.add_component(format!("channel-{channel_id}-getid"));
-                channel_get_ids.push(get_id);
-                let send_id =
-                    shared_comp_time.add_component(format!("channel-{channel_id}-sendid"));
-                channel_send_ids.push(send_id);
-                let aqcuire =
-                    shared_comp_time.add_component(format!("channel-{channel_id}-acquireid"));
-                channel_aqcuire_ids.push(aqcuire);
-                let release_id =
-                    shared_comp_time.add_component(format!("channel-{channel_id}-releaseid"));
-                channel_release_ids.push(release_id);
-
-                let channel = ChannelMerger::new(
-                    store_id,
-                    chip_stores.clone(),
-                    merger_resouce_id,
-                    merger_status_id,
-                    level_time_id,
-                    get_id,
-                    send_id,
-                    aqcuire,
-                    release_id,
-                );
-
-                // create the process
-                let id = sim.create_process(channel.run());
-                sim.schedule_event(0., id, status.clone());
-
-                // create the merger_task_worker
-                let mut task_receiver = vec![];
-                for i in 0..mem_settings.channel_merger_count {
-                    let resouce = sim.create_resource(Box::new(Store::new(store_size)));
-                    let comp_id = shared_comp_time.add_component("123");
-                    let return_idle_id = shared_comp_time.add_component("123");
-                    channel_wait_ids.push(comp_id);
-                    channel_ret_ids.push(return_idle_id);
-                    comp_ids.insert(
-                        MergerId {
-                            level_id: LevelId::Channel(channel_id),
-                            id: i,
-                        },
-                        comp_id,
-                    );
-                    let merger_task_worker = MergerWorker {
-                        merger_size: mem_settings.channel_merger_size,
-                        merger_status_id,
-                        merger_work_resource: merger_resouce_id,
-                        partial_sum_sender: dimm_merger_worker_task_in,
-                        task_reciever: resouce,
-                        task_sender_input_id: store_id,
-                        self_level_id: channel_id,
-                        comp_id,
-                        return_idle_id,
-                    };
-                    let id = sim.create_process(merger_task_worker.run());
-                    sim.schedule_event(0., id, status.clone());
-                    task_receiver.push(resouce);
-                }
-                // create the channel merger_task_dispatcher
-                let channel_merger_worker_task_in =
-                    sim.create_resource(Box::new(Store::new(store_size)));
-                let merger_task_dispatcher = MergerWorkerDispatcher {
-                    merger_status_id,
-                    merger_task_sender: task_receiver,
-                    partial_sum_task_in: channel_merger_worker_task_in,
-                    self_level_id: channel_id,
-                };
-                let id = sim.create_process(merger_task_dispatcher.run());
-                sim.schedule_event(0., id, status.clone());
-
-                // 4. add the chip
-                chip_stores
-                    .into_iter()
-                    .enumerate()
-                    .for_each(|(chip_id, store_id)| {
-                        // create the chip!
-                        let chip_id = (channel_id, chip_id);
-                        let num_banks = mem_settings.banks;
-                        let bank_stores = (0..num_banks)
-                            .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
-                            .collect_vec();
-                        let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
-                            mem_settings.chip_merger_count,
-                        )));
-                        let merger_status_id = merger_status
-                            .borrow_mut()
-                            .create_merger_status(mem_settings.chip_merger_count);
-                        let chip_level_id = shared_level_time.add_level();
-                        level_ids.insert(PureLevelId::Chip, chip_level_id);
-
-                        let get_id =
-                            shared_comp_time.add_component(format!("chip-{chip_id:?}-getid"));
-                        chip_get_ids.push(get_id);
-                        let send_id =
-                            shared_comp_time.add_component(format!("chip-{chip_id:?}-sendid"));
-                        chip_send_ids.push(send_id);
-                        let aqcuire =
-                            shared_comp_time.add_component(format!("chip-{chip_id:?}-acquireid"));
-                        chip_aqcuire_ids.push(aqcuire);
-                        let release_id =
-                            shared_comp_time.add_component(format!("chip-{chip_id:?}-releaseid"));
-                        chip_release_ids.push(release_id);
-                        let chip = ChipMerger::new(
-                            store_id,
-                            bank_stores.clone(),
-                            merger_resouce_id,
-                            merger_status_id,
-                            chip_level_id,
-                            get_id,
-                            send_id,
-                            aqcuire,
-                            release_id,
-                        );
-
-                        // create the process
-                        let id = sim.create_process(chip.run());
-                        sim.schedule_event(0., id, status.clone());
-
-                        // create the merger_task_worker
-                        let mut task_receiver = vec![];
-                        for _i in 0..mem_settings.chip_merger_count {
-                            let resouce = sim.create_resource(Box::new(Store::new(store_size)));
-                            let comp_id = shared_comp_time.add_component("123");
-                            let return_idle_id = shared_comp_time.add_component("123");
-                            chip_wait_ids.push(comp_id);
-                            chip_ret_ids.push(return_idle_id);
-                            comp_ids.insert(
-                                MergerId {
-                                    level_id: LevelId::Chip(chip_id),
-                                    id: _i,
-                                },
-                                comp_id,
-                            );
-                            let merger_task_worker = MergerWorker {
-                                merger_size: mem_settings.chip_merger_size,
-                                merger_status_id,
-                                merger_work_resource: merger_resouce_id,
-                                partial_sum_sender: channel_merger_worker_task_in,
-                                task_reciever: resouce,
-                                task_sender_input_id: store_id,
-                                self_level_id: chip_level_id,
-                                comp_id,
-                                return_idle_id,
-                            };
-                            let id = sim.create_process(merger_task_worker.run());
-                            sim.schedule_event(0., id, status.clone());
-                            task_receiver.push(resouce);
-                        }
-                        // create the chip merger_task_dispatcher
-                        let chip_merger_worker_task_in =
-                            sim.create_resource(Box::new(Store::new(store_size)));
-                        let merger_task_dispatcher = MergerWorkerDispatcher {
-                            merger_status_id,
-                            merger_task_sender: task_receiver,
-                            partial_sum_task_in: chip_merger_worker_task_in,
-                            self_level_id: chip_level_id,
-                        };
-                        let id = sim.create_process(merger_task_dispatcher.run());
-                        sim.schedule_event(0., id, status.clone());
-
-                        // 5. add the bank
-                        bank_stores
-                            .into_iter()
-                            .enumerate()
-                            .for_each(|(bank_id, store_id)| {
-                                // create the bank!
-                                let bank_id = (chip_id, bank_id);
-
-                                let bank_pe_stores = (0..mem_settings.bank_merger_count)
-                                    .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
-                                    .collect_vec();
-
-                                let comp_id = shared_comp_time.add_component("1123");
-                                let bank = BankTaskReorder::new(
-                                    store_id,
-                                    bank_pe_stores.clone(),
-                                    mem_settings.reorder_count,
-                                    bank_id,
-                                    mem_settings.row_change_latency as f64,
-                                    comp_id,
-                                );
-
-                                // create the process
-                                let id = sim.create_process(bank.run());
-                                sim.schedule_event(0., id, status.clone());
-
-                                for bank_pe_store_id in bank_pe_stores {
-                                    let comp_id = shared_comp_time.add_component("33");
-                                    let return_idle_id = shared_comp_time.add_component("33");
-                                    bank_wait_ids.push(comp_id);
-                                    bank_ret_ids.push(return_idle_id);
-
-                                    comp_ids.insert(
-                                        MergerId {
-                                            level_id: LevelId::Bank(bank_id),
-                                            id: bank_pe_store_id,
-                                        },
-                                        comp_id,
-                                    );
-                                    let bank_pe = BankPe::new(
-                                        bank_pe_store_id,
-                                        chip_merger_worker_task_in,
-                                        mem_settings.bank_merger_size,
-                                        mem_settings.bank_adder_size,
-                                        store_id,
-                                        comp_id,
-                                        return_idle_id,
-                                    );
-                                    let id = sim.create_process(bank_pe.run());
-                                    sim.schedule_event(0., id, status.clone());
-                                }
-                            });
-                    });
-            });
-        // start
-        let sim = sim.run(EndCondition::NoEvents);
-        let end_time = sim.time();
-
-        // finished, print the result
-        // the result is the comp_time and level_time
-
-        // build the histogram
-        let histograms_idle = unsafe { &*shared_comp_time.componet_idle_time.get() }
-            .iter()
-            .map(|(_x, v)| {
-                v.iter()
-                    .fold(Histogram::<u64>::new(3).unwrap(), |mut acc, item| {
-                        acc += *item as u64;
-                        acc
-                    })
-            })
-            .collect_vec();
-        let histogram_level_finished = unsafe { &*shared_level_time.level_finished_time.get() }
-            .iter()
-            .map(|x| {
-                x.iter()
-                    .map(|x| x.0)
-                    .fold(Histogram::<u64>::new(3).unwrap(), |mut acc, item| {
-                        acc += item as u64;
-                        acc
-                    })
-            })
-            .collect_vec();
-        let histogram_work_gap = unsafe { &*shared_level_time.level_finished_time.get() }
-            .iter()
-            .map(|x| {
-                x.iter()
-                    .map(|x| x.1)
-                    .fold(Histogram::<u64>::new(3).unwrap(), |mut acc, item| {
-                        acc += item as u64;
-                        acc
-                    })
-            })
-            .collect_vec();
-        // show the result
-        for (k, v) in comp_ids {
-            info!("comp_ids:{:?}:{:?}", k, v);
-            let histogram = histograms_idle.get(v).unwrap();
-            info!(
-                "comp_idle_time:mean: {:?} max: {} min: {}, 25qt: {}, 50qt: {}, 75qt: {} ",
-                histogram.mean(),
-                histogram.max(),
-                histogram.min(),
-                histogram.value_at_quantile(0.25),
-                histogram.value_at_quantile(0.5),
-                histogram.value_at_quantile(0.75)
-            );
-        }
-
-        for (k, v) in level_ids {
-            info!("level_ids:{:?}:{:?}", k, v);
-            let histogram = histogram_level_finished.get(v).unwrap();
-            info!(
-                "level_finished_time:mean: {:?} max: {} min: {}, 25qt: {}, 50qt: {}, 75qt: {} ",
-                histogram.mean(),
-                histogram.max(),
-                histogram.min(),
-                histogram.value_at_quantile(0.25),
-                histogram.value_at_quantile(0.5),
-                histogram.value_at_quantile(0.75)
-            );
-            let histogram = histogram_work_gap.get(v).unwrap();
-            info!(
-                "level_work_gap:mean: {:?} max: {} min: {}, 25qt: {}, 50qt: {}, 75qt: {} ",
-                histogram.mean(),
-                histogram.max(),
-                histogram.min(),
-                histogram.value_at_quantile(0.25),
-                histogram.value_at_quantile(0.5),
-                histogram.value_at_quantile(0.75)
-            );
-        }
-        let mut all_result = vec![];
-        // --------------------------------------------------start bank
-        // new code for bank idle average:
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &bank_wait_ids, &shared_comp_time) };
-        info!("bank_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // new code for bank ret idle average:
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &bank_ret_ids, &shared_comp_time) };
-        info!("bank_ret_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let bank_read=todo!();
-        let bank_comp=todo!();
-        // ------------end bank, start chip------------------
-        // new code for chip idle average:
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &chip_wait_ids, &shared_comp_time) };
-        info!("chip_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // new code for chip ret idle average:
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &chip_ret_ids, &shared_comp_time) };
-        info!("chip_ret_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // ------------end chip, start channel------------------
-        // new code for channel ret idle average:
-        // new code for channel idle average:
-
-        let raitio =
-            unsafe { calculate_raition_rate(end_time, &channel_wait_ids, &shared_comp_time) };
-        info!("channel_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // new code for channel ret idle average:
-
-        let raitio =
-            unsafe { calculate_raition_rate(end_time, &channel_ret_ids, &shared_comp_time) };
-        info!("channel_ret_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // ------------end channel, start dimm------------------
-        // new code for dimm idle average:
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_wait_ids, &shared_comp_time) };
-        info!("dimm_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // new code for dimm ret idle average:
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_ret_ids, &shared_comp_time) };
-        info!("dimm_ret_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // dimm
-        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_get_ids, &shared_comp_time) };
-        info!("dimm_get_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_send_ids, &shared_comp_time) };
-        info!("dimm_send_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio =
-            unsafe { calculate_raition_rate(end_time, &dimm_aqcuire_ids, &shared_comp_time) };
-        info!("dimm_aqcuire_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &dimm_release_ids, &shared_comp_time) };
-        info!("dimm_release_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-        // channel
-        let raitio = unsafe { calculate_raition_rate(end_time, &channel_get_ids, &shared_comp_time) };
-        info!("channel_get_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &channel_send_ids, &shared_comp_time) };
-        info!("channel_send_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio =
-            unsafe { calculate_raition_rate(end_time, &channel_aqcuire_ids, &shared_comp_time) };
-        info!("channel_aqcuire_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
+            status,
+            final_receiver_resouce,
+            dimm_level_id,
+            channel_level_id,
+            chip_level_id,
+            bank_level_id,
+        )?;
         
-        let raitio = unsafe { calculate_raition_rate(end_time, &channel_release_ids, &shared_comp_time) };
-        info!("channel_release_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        // chip
-        let raitio = unsafe { calculate_raition_rate(end_time, &chip_get_ids, &shared_comp_time) };
-        info!("chip_get_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &chip_send_ids, &shared_comp_time) };
-        info!("chip_send_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &chip_aqcuire_ids, &shared_comp_time) };
-        info!("chip_aqcuire_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-        let raitio = unsafe { calculate_raition_rate(end_time, &chip_release_ids, &shared_comp_time) };
-        info!("chip_release_idle_raitio: {:?}", raitio);
-        all_result.push(raitio);
-
-
-        Ok(all_result)
+        Ok(vec![])
     }
 }
 
@@ -880,7 +698,7 @@ mod test {
             Rc::new(RefCell::new(BTreeMap::new())),
             Rc::new(SharedSimTime::new()),
             Rc::new(LevelTime::new()),
-            Rc::new(ComponentTime::new()),
+            Rc::new(SharedNamedTime::new()),
         );
         sim.schedule_event(0., process1, status.copy_default());
         sim.schedule_event(0., process2, status.copy_default());
