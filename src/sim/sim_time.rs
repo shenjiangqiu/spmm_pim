@@ -67,6 +67,16 @@ impl SharedNamedTime {
             .1
             .add_idle_time(name, idle_time);
     }
+
+    pub fn show_data(&self, sim_time: f64) {
+        unsafe {
+            let data = &*self.data.get();
+            for (name, time) in data.iter() {
+                println!("{}", name);
+                time.show_data(sim_time);
+            }
+        }
+    }
 }
 
 /// a dynamic time statistics of a component
@@ -81,6 +91,19 @@ impl NamedTime {
     fn new() -> Self {
         NamedTime {
             data: BTreeMap::new(),
+        }
+    }
+
+    fn show_data(&self, sim_time: f64) {
+        let total_time: f64 = self.data.iter().map(|(n, t)| t).sum();
+        for (name, time) in self.data.iter() {
+            println!(
+                "{}:{}:{}:{}",
+                name,
+                time,
+                time / total_time,
+                time / sim_time
+            );
         }
     }
     fn add_idle_time(&mut self, name: &str, idle_time: f64) {

@@ -4,7 +4,7 @@ use sprs::{CsMat, CsMatBase, IndPtr, IndPtrBase, SpIndex};
 use std::ops::Deref;
 
 use crate::bsr_row_builder::BsrRowbuilder;
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Bsr<
     const R: usize,
     const C: usize,

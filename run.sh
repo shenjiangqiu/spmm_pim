@@ -1,0 +1,1 @@
+cargo run --release -- .\configs\debug.toml .\configs\ddr4.toml .\configs\

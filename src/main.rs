@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self};
 use std::{env::args_os, fs::File};
 
 use clap::{Command, IntoApp, Parser};
@@ -71,18 +71,18 @@ fn _main(args: Args) -> Result<()> {
                     let mtx_file_name = name.file_stem().unwrap();
                     let trans_pose = csr.transpose_view().to_csr();
                     let two_matrix = TwoMatrix::new(csr, trans_pose);
-                    let result = spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?;
+                    spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?;
                     // write the result to file
                     let file_name = format!(
                         "{}_{}.txt",
                         result_file.display(),
                         mtx_file_name.to_str().unwrap()
                     );
-                    let mut file = File::create(&file_name)
+                    let mut _file = File::create(&file_name)
                         .wrap_err(format!("the path: {} is invalid!", file_name))?;
-                    for i in result {
-                        writeln!(file, "{}", i)?;
-                    }
+                    // for i in result {
+                    //     writeln!(file, "{}", i)?;
+                    // }
 
                     info!("finished graph: {:?}", name);
                     Ok(name)

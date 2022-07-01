@@ -585,7 +585,7 @@ impl Simulator {
     pub fn run(
         mem_settings: &MemSettings,
         input_matrix: TwoMatrix<i32, i32>,
-    ) -> Result<Vec<f64>, eyre::Report> {
+    ) -> Result<(), eyre::Report> {
         let store_size = mem_settings.store_size;
         // now we need a stucture to map the sim_time id to the real component time
 
@@ -640,7 +640,7 @@ impl Simulator {
             store_size,
             merger_status,
             &mut sim,
-            shared_comp_time,
+            shared_comp_time.clone(),
             task_send_store,
             status,
             final_receiver_resouce,
@@ -649,8 +649,11 @@ impl Simulator {
             chip_level_id,
             bank_level_id,
         )?;
-        
-        Ok(vec![])
+        let sim = sim.run(EndCondition::NoEvents);
+        let time = sim.time();
+        shared_comp_time.show_data(time);
+
+        Ok(())
     }
 }
 

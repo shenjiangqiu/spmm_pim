@@ -207,6 +207,7 @@ pub struct BankTaskReorder {
     pub comp_id: NamedTimeId,
 }
 
+// TODO
 impl Component for BankTaskReorder {
     fn run(self) -> Box<super::SpmmGenerator> {
         let num_pes = self.task_out.len();
@@ -222,7 +223,7 @@ impl Component for BankTaskReorder {
                     yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (time, pop_status) = context.into_inner();
                 let gap = time - current_time;
-
+                // TODO: add the idle time to the comp_time
                 current_time = time;
                 debug!(
                     "TASK_REORDER: time: {},received taske: {:?}",

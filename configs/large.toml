@@ -1,6 +1,5 @@
 
 mtx_files = [
-  "mtx/NotreDame_www.mtx",
   "mtx/Groebner_id2003_aug.mtx",
   "mtx/Franz6_id1959_aug.mtx",
   "mtx/Pd.mtx",

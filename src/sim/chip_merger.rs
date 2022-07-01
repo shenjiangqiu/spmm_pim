@@ -58,7 +58,7 @@ impl MergerTaskSender for ChipMerger {
     }
 
     fn get_time_id(&self) -> &super::sim_time::NamedTimeId {
-        todo!()
+        &self.time_id
     }
 }
 
