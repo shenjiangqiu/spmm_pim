@@ -98,11 +98,11 @@ impl NamedTime {
         let total_time: f64 = self.data.iter().map(|(n, t)| t).sum();
         for (name, time) in self.data.iter() {
             println!(
-                "{}:{}:{}:{}",
+                "{}: {}: {:.1}% :{:.1}%",
                 name,
                 time,
-                time / total_time,
-                time / sim_time
+                time / total_time * 100.0,
+                time / sim_time * 100.0
             );
         }
     }
