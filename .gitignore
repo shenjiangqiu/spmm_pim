@@ -3,3 +3,4 @@
 /log
 *.svg
 *.txt
+Cargo.lock

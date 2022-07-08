@@ -8,10 +8,14 @@ pub mod id_translation;
 pub mod merger_task_dispather;
 pub mod merger_task_sender;
 pub mod merger_task_worker;
+pub mod partial_sum_collector;
+pub mod partial_sum_sender;
+pub mod partial_sum_signal_collector;
 pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
+
 use desim::{
     prelude::*,
     resources::{CopyDefault, SimpleResource, Store},
@@ -63,6 +67,19 @@ pub enum BankTaskEnum {
     #[default]
     EndThisTask,
 }
+
+/// this struct contains the information of the signale that send from the partial sum sender,
+/// it should contains: 1. the target id, 2. the source id
+/// it will be send by the `partial_sum_sender`
+#[derive(Debug, Clone, Default)]
+pub struct PartialSignal {}
+
+impl PartialSignal {
+    pub fn get_queue_id(&self) -> usize {
+        todo!()
+    }
+}
+
 pub type BankTaskType = BankTaskEnum;
 // target row, sender_id, target result
 pub type PartialResultTaskType = (usize, ResourceId, CsVecNodata<usize>);
@@ -76,6 +93,8 @@ pub enum SpmmStatusEnum {
     PushBankTask(ResourceId, BankTaskType),
     PushPartialTask(ResourceId, PartialResultTaskType),
     PushReadBankTask(ResourceId, BankReadRowTaskType),
+    PushSignal(ResourceId, PartialSignal),
+    PushReadyQueueId(ResourceId, usize),
     Acquire(ResourceId),
     Release(ResourceId),
     Pop(ResourceId),
@@ -226,6 +245,8 @@ impl SimState for SpmmStatus {
             SpmmStatusEnum::PushReadBankTask(rid, _) => Effect::Push(*rid),
             SpmmStatusEnum::Acquire(rid) => Effect::Request(*rid),
             SpmmStatusEnum::Release(rid) => Effect::Release(*rid),
+            SpmmStatusEnum::PushSignal(rid, _) => Effect::Push(*rid),
+            SpmmStatusEnum::PushReadyQueueId(rid, _) => Effect::Push(*rid),
         }
     }
 
@@ -368,9 +389,12 @@ fn build_channel(
     for (channel_id, store_id) in channel_stores.into_iter().enumerate() {
         // create the channel!
         let num_chips = mem_settings.chips;
+
+        // the channel that send task to the chip from this channel
         let chip_stores = (0..num_chips)
             .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
             .collect_vec();
+
         let merger_status_id = merger_status
             .borrow_mut()
             .create_merger_status(mem_settings.channel_merger_count);

@@ -131,6 +131,7 @@ impl<T> Component for T
 where
     T: MergerTaskSender + 'static,
 {
+    /// the merger task sender
     fn run(self) -> Box<super::SpmmGenerator> {
         Box::new(move |context: SpmmContex| {
             let (_time, status) = context.into_inner();
