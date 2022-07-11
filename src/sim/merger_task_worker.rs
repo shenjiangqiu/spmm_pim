@@ -43,7 +43,7 @@ impl Component for MergerWorker {
                     the_first_time = _time;
                 }
                 // send read request to row buffer.
-                let (_enable_log, state, merger_status, _bank_status, level_time, comp_time) =
+                let (_enable_log, state, merger_status, _bank_status, level_time, comp_time, ..) =
                     pop_status.into_inner();
                 unsafe {
                     // Safety: the comp_id is valid!

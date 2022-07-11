@@ -144,6 +144,7 @@ impl Component for BankPe {
                     shared_comp_time,
                     state,
                     enable_log: _,
+                    shared_buffer_status: _,
                 } = pop_status;
                 let (_resouce_id, bank_task) = state.into_push_bank_task().unwrap();
                 unsafe {
@@ -237,6 +238,7 @@ impl Component for BankTaskReorder {
                     shared_sim_time: _,
                     shared_level_time: _,
                     shared_comp_time,
+                    shared_buffer_status: _,
                 } = pop_status;
                 unsafe {
                     // safety: the comp_id is set by add_comp, that should be valid!
@@ -367,6 +369,7 @@ mod test {
             Rc::new(SharedSimTime::new()),
             shared_level_time,
             shared_comp_time.clone(),
+            Rc::new(Default::default()),
         );
         debug!("start test");
         let mut simulator = Simulation::new();

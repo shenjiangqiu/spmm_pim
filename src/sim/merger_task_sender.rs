@@ -146,7 +146,7 @@ where
                 let (_time, task) = context.into_inner();
                 let gap = _time - current_time;
                 current_time = _time;
-                let (_, task, merger_status, _, _, named_time) = task.into_inner();
+                let (_, task, merger_status, _, _, named_time, ..) = task.into_inner();
                 unsafe {
                     named_time.add_idle_time(*self.get_time_id(), "get_task", gap);
                 }

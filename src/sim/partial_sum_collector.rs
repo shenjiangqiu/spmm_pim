@@ -2,10 +2,14 @@
 
 use super::{component::Component, PartialResultTaskType, SpmmContex};
 
-//
+/// collect the partial sum from lower pe,
+/// when all lower pe have returned their partial sum, push it to the full_result_merger_dispatcher
 pub struct PartialSumCollector {
     queue_id_ready_in: usize,
-    queue_id_partial_out: usize,
+    queue_id_full_result_out: usize,
+
+    // to record how many partial sum have been collected(hint: the old merger_worker will do this!)
+    merger_status_id: usize,
 }
 
 impl Component for PartialSumCollector {
@@ -27,18 +31,14 @@ impl Component for PartialSumCollector {
                 let (time, partial_sum_status) = partial_sum_context.into_inner();
                 let gap = time - current_time;
                 current_time = time;
-                let (_, partial_sum_enum, ..) = partial_sum_status.into_inner();
+                let (_, partial_sum_enum, _, _, _, _, buffer) = partial_sum_status.into_inner();
                 let patial_result: PartialResultTaskType =
                     partial_sum_enum.into_push_partial_task().unwrap().1;
+                // need to test if this partial_result is already finished(all sub tasks are finished)
+                
 
-                let push_partial_sum_context =
-                    yield original_status.clone_with_state(super::SpmmStatusEnum::PushPartialTask(
-                        self.queue_id_partial_out,
-                        patial_result,
-                    ));
-                let (time, _) = push_partial_sum_context.into_inner();
-                let gap = time - current_time;
-                current_time = time;
+                // collect this partial sum, if it's already full, send it to the full_result_merger_dispatcher
+                // we also need some structure to record the buffer status.(this should be shared by data collector and signal collector)
             }
         })
     }

@@ -1,9 +1,11 @@
 pub mod bank;
+mod buffer_status;
 pub mod channel_merger;
 pub mod chip_merger;
 pub mod component;
 pub mod dimm_merger;
 pub mod final_receiver;
+mod full_result_merger_worker;
 pub mod id_translation;
 pub mod merger_task_dispather;
 pub mod merger_task_sender;
@@ -15,7 +17,6 @@ pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
-
 use desim::{
     prelude::*,
     resources::{CopyDefault, SimpleResource, Store},
@@ -30,6 +31,7 @@ use std::{cell::RefCell, collections::BTreeMap, ops::Generator, path::Path, rc::
 
 use self::{
     bank::{BankPe, BankTaskReorder},
+    buffer_status::SharedBufferStatus,
     channel_merger::ChannelMerger,
     chip_merger::ChipMerger,
     component::Component,
@@ -72,17 +74,23 @@ pub enum BankTaskEnum {
 /// it should contains: 1. the target id, 2. the source id
 /// it will be send by the `partial_sum_sender`
 #[derive(Debug, Clone, Default)]
-pub struct PartialSignal {}
+pub struct PartialSignal {
+    pub target_id: usize,
+    pub self_sender_id: usize,
+    pub self_queue_id: usize,
+}
 
 impl PartialSignal {
     pub fn get_queue_id(&self) -> usize {
-        todo!()
+        self.self_queue_id
     }
 }
 
 pub type BankTaskType = BankTaskEnum;
 // target row, sender_id, target result
 pub type PartialResultTaskType = (usize, ResourceId, CsVecNodata<usize>);
+// target row, and all partial result
+pub type FullTaskType = (usize, Vec<CsVecNodata<usize>>);
 pub type BankReadRowTaskType = usize;
 
 #[derive(Default, Debug, Clone, EnumAsInner)]
@@ -95,6 +103,7 @@ pub enum SpmmStatusEnum {
     PushReadBankTask(ResourceId, BankReadRowTaskType),
     PushSignal(ResourceId, PartialSignal),
     PushReadyQueueId(ResourceId, usize),
+    PushFullPartialTask(ResourceId, FullTaskType),
     Acquire(ResourceId),
     Release(ResourceId),
     Pop(ResourceId),
@@ -111,6 +120,7 @@ pub struct SpmmStatus {
     pub shared_sim_time: Rc<SharedSimTime>,
     pub shared_level_time: Rc<LevelTime>,
     pub shared_comp_time: Rc<SharedNamedTime>,
+    pub shared_buffer_status: Rc<SharedBufferStatus>,
 }
 impl CopyDefault for SpmmStatus {
     fn copy_default(&self) -> Self {
@@ -121,6 +131,7 @@ impl CopyDefault for SpmmStatus {
         let shared_sim_time = self.shared_sim_time.clone();
         let shared_level_time = self.shared_level_time.clone();
         let shared_comp_time = self.shared_comp_time.clone();
+        let shared_buffer_status = self.shared_buffer_status.clone();
         Self {
             state: SpmmStatusEnum::Continue,
             enable_log,
@@ -129,6 +140,7 @@ impl CopyDefault for SpmmStatus {
             shared_sim_time,
             shared_level_time,
             shared_comp_time,
+            shared_buffer_status,
         }
     }
 }
@@ -140,6 +152,7 @@ type StatusTuple = (
     Rc<RefCell<BTreeMap<PeID, usize>>>,
     Rc<LevelTime>,
     Rc<SharedNamedTime>,
+    Rc<SharedBufferStatus>,
 );
 
 impl SpmmStatus {
@@ -150,6 +163,7 @@ impl SpmmStatus {
         shared_sim_time: Rc<SharedSimTime>,
         shared_level_time: Rc<LevelTime>,
         shared_comp_time: Rc<SharedNamedTime>,
+        shared_buffer_status: Rc<SharedBufferStatus>,
     ) -> Self {
         Self {
             state,
@@ -159,7 +173,20 @@ impl SpmmStatus {
             shared_sim_time,
             shared_level_time,
             shared_comp_time,
+            shared_buffer_status,
         }
+    }
+    pub fn get_target_pe_from_target_row(
+        &self,
+        status_id: usize,
+        target_row: usize,
+    ) -> Option<usize> {
+        self.shared_merger_status
+            .borrow()
+            .get_merger_status(status_id)
+            .current_working_merger
+            .get(&target_row)
+            .cloned()
     }
 
     pub fn clone_with_state(&self, state: SpmmStatusEnum) -> Self {
@@ -171,6 +198,7 @@ impl SpmmStatus {
             shared_sim_time: self.shared_sim_time.clone(),
             shared_level_time: self.shared_level_time.clone(),
             shared_comp_time: self.shared_comp_time.clone(),
+            shared_buffer_status: self.shared_buffer_status.clone(),
         }
     }
 
@@ -188,6 +216,7 @@ impl SpmmStatus {
         shared_sim_time: Rc<SharedSimTime>,
         shared_level_time: Rc<LevelTime>,
         shared_comp_time: Rc<SharedNamedTime>,
+        shared_buffer_status: Rc<SharedBufferStatus>,
     ) -> Self {
         Self {
             state,
@@ -197,6 +226,7 @@ impl SpmmStatus {
             shared_sim_time,
             shared_level_time,
             shared_comp_time,
+            shared_buffer_status,
         }
     }
     pub fn state(&self) -> &SpmmStatusEnum {
@@ -210,6 +240,7 @@ impl SpmmStatus {
             self.shared_bankpe_status,
             self.shared_level_time,
             self.shared_comp_time,
+            self.shared_buffer_status,
         )
     }
 }
@@ -247,6 +278,7 @@ impl SimState for SpmmStatus {
             SpmmStatusEnum::Release(rid) => Effect::Release(*rid),
             SpmmStatusEnum::PushSignal(rid, _) => Effect::Push(*rid),
             SpmmStatusEnum::PushReadyQueueId(rid, _) => Effect::Push(*rid),
+            SpmmStatusEnum::PushFullPartialTask(rid, _) => Effect::Push(*rid),
         }
     }
 
@@ -628,7 +660,7 @@ impl Simulator {
         let bank_level_id = shared_level_time.add_level();
 
         let shared_comp_time = Rc::new(SharedNamedTime::new());
-
+        let shared_buffer_status = Rc::new(SharedBufferStatus::default());
         let sim_time = Rc::new(SharedSimTime::new());
         let status = SpmmStatus::new(
             SpmmStatusEnum::Continue,
@@ -637,6 +669,7 @@ impl Simulator {
             sim_time,
             shared_level_time,
             shared_comp_time.clone(),
+            shared_buffer_status,
         );
 
         let final_receiver_resouce = sim.create_resource(Box::new(Store::new(store_size)));
@@ -726,6 +759,7 @@ mod test {
             Rc::new(SharedSimTime::new()),
             Rc::new(LevelTime::new()),
             Rc::new(SharedNamedTime::new()),
+            Rc::new(SharedBufferStatus::default()),
         );
         sim.schedule_event(0., process1, status.copy_default());
         sim.schedule_event(0., process2, status.copy_default());
