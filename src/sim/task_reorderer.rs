@@ -4,7 +4,9 @@
 
 use desim::ResourceId;
 
-use super::{component::Component, SpmmContex, SpmmGenerator, SpmmStatusEnum};
+use super::{
+    component::Component, SpmmContex, SpmmGenerator, SpmmStatusEnum, StateWithSharedStatus,
+};
 pub struct TaskReordererSetting {}
 pub struct TaskReorderer {
     pub task_in: ResourceId,
@@ -29,17 +31,21 @@ impl TaskReorderer {
 impl Component for TaskReorderer {
     fn run(self) -> Box<SpmmGenerator> {
         Box::new(move |context: SpmmContex| {
-            let (_time, status) = context.into_inner();
+            let (_time, original_status) = context.into_inner();
             loop {
                 let task: SpmmContex =
-                    yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
+                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (_time, state) = task.into_inner();
-                let (_, state, ..) = state.into_inner();
-                let task = state.into_push_bank_task().unwrap().1;
+                let StateWithSharedStatus {
+                    status,
+                    shared_status: _,
+                } = state.into_inner();
+                let task = status.into_push_bank_task().unwrap().1;
                 // do some reorder work
 
                 // finished, push the task
-                yield status.clone_with_state(SpmmStatusEnum::PushBankTask(self.task_out, task));
+                yield original_status
+                    .clone_with_state(SpmmStatusEnum::PushBankTask(self.task_out, task));
             }
         })
     }

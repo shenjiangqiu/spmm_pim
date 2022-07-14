@@ -4,15 +4,22 @@
 
 use desim::ResourceId;
 
-use super::{merger_task_sender::*, BankID, sim_time::{NamedTimeId, LevelTimeId}};
+use super::{
+    buffer_status::BufferStatusId,
+    merger_status::MergerStatusId,
+    merger_task_sender::*,
+    sim_time::{LevelTimeId, NamedTimeId},
+    BankID,
+};
 pub struct ChipMerger {
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
     pub merger_resouce: ResourceId,
 
     // settings
-    pub merger_status_id: usize,
+    pub merger_status_id: MergerStatusId,
     pub self_level_time_id: LevelTimeId,
+    pub buffer_status_id: BufferStatusId,
 
     pub time_id: NamedTimeId,
 }
@@ -22,9 +29,10 @@ impl ChipMerger {
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
         merger_resouce: ResourceId,
-        merger_status_id: usize,
+        merger_status_id: MergerStatusId,
         self_level_time_id: LevelTimeId,
         time_id: NamedTimeId,
+        buffer_status_id: BufferStatusId,
     ) -> Self {
         Self {
             task_in,
@@ -33,6 +41,7 @@ impl ChipMerger {
             merger_status_id,
             self_level_time_id,
             time_id,
+            buffer_status_id,
         }
     }
 }
@@ -49,8 +58,8 @@ impl MergerTaskSender for ChipMerger {
     fn get_merger_resouce_id(&self) -> ResourceId {
         self.merger_resouce
     }
-    fn get_merger_status_id(&self) -> usize {
-        self.merger_status_id
+    fn get_merger_status_id(&self) -> &MergerStatusId {
+        &self.merger_status_id
     }
 
     fn get_lower_pes(&self) -> &[ResourceId] {
@@ -60,35 +69,38 @@ impl MergerTaskSender for ChipMerger {
     fn get_time_id(&self) -> &super::sim_time::NamedTimeId {
         &self.time_id
     }
+
+    fn get_buffer_id(&self) -> &BufferStatusId {
+        &self.buffer_status_id
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use std::{cell::RefCell, collections::BTreeMap, path::Path, rc::Rc};
+    // use std::{cell::RefCell, collections::BTreeMap, path::Path, rc::Rc};
 
-    use desim::{
-        resources::{CopyDefault, SimpleResource, Store},
-        EndCondition, Simulation,
-    };
-    use itertools::Itertools;
-    use log::debug;
+    // use desim::{
+    //     resources::{CopyDefault, SimpleResource, Store},
+    //     EndCondition, Simulation,
+    // };
+    // use itertools::Itertools;
+    // use log::debug;
 
-    use crate::{
-        settings::RowMapping,
-        sim::{
-            self,
-            bank::{BankPe, BankTaskReorder},
-            component::Component,
-            final_receiver::FinalReceiver,
-            merger_task_worker::MergerWorker,
-            sim_time::{ComponentTime, LevelTime, SharedSimTime},
-            task_sender::TaskSender,
-            SpmmStatus, SpmmStatusEnum,
-        },
-    };
+    // use crate::{
+    //     settings::RowMapping,
+    //     sim::{
+    //         self,
+    //         bank::{BankPe, BankTaskReorder},
+    //         component::Component,
+    //         final_receiver::FinalReceiver,
+    //         sim_time::{ComponentTime, LevelTime, SharedSimTime},
+    //         task_sender::TaskSender,
+    //         SpmmStatus, SpmmStatusEnum,
+    //     },
+    // };
 
-    use super::*;
+    // use super::*;
     // #[test]
     // fn test_bank() {
     //     // ---- first create neccessary status structures

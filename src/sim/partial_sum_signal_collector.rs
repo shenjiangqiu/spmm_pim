@@ -2,52 +2,95 @@
 //!
 //!
 
-use super::{component::Component, PartialSignal, SpmmContex};
+use std::collections::VecDeque;
 
-struct CollectStatus {}
-
-impl CollectStatus {
-    fn new() -> CollectStatus {
-        CollectStatus {}
-    }
-    /// update a new partial signal and return ready signal
-    fn update(&mut self, _: PartialSignal) -> Vec<PartialSignal> {
-        vec![]
-    }
-}
+use super::{
+    buffer_status::BufferStatusId, component::Component, SpmmContex, SpmmStatusEnum,
+    StateWithSharedStatus,
+};
 
 pub struct PartialSumSignalCollector {
-    queue_id_signal_in: usize,
-    queue_id_ready_out: usize,
-    collect_status: CollectStatus,
+    pub queue_id_signal_in: usize,
+    pub queue_id_ready_out: usize,
+
+    pub buffer_status_id: BufferStatusId,
 }
 
 impl Component for PartialSumSignalCollector {
-    fn run(mut self) -> Box<super::SpmmGenerator> {
+    fn run(self) -> Box<super::SpmmGenerator> {
         Box::new(move |context: SpmmContex| {
             let mut current_time = 0.;
-            let (time, original_status) = context.into_inner();
+            // currently cannot receive the data, store the signal
+            let mut temp_signal_queue: VecDeque<_> = Default::default();
+
+            let (_time, original_status) = context.into_inner();
 
             loop {
                 // first get the signal
                 let signal_context: SpmmContex = yield original_status
                     .clone_with_state(super::SpmmStatusEnum::Pop(self.queue_id_signal_in));
                 let (time, signal_status) = signal_context.into_inner();
-                let gap = time - current_time;
+                let _gap = time - current_time;
                 current_time = time;
 
-                let (_, signal_enum, ..) = signal_status.into_inner();
-                let signal: PartialSignal = signal_enum.into_push_signal().unwrap().1;
-
-                for ready_signal in self.collect_status.update(signal) {
-                    let ready_queue = ready_signal.get_queue_id();
-                    yield original_status.clone_with_state(
-                        super::SpmmStatusEnum::PushReadyQueueId(
-                            self.queue_id_ready_out,
-                            ready_queue,
-                        ),
-                    );
-                }
+                let StateWithSharedStatus {
+                    status,
+                    shared_status,
+                } = signal_status.into_inner();
+                match status {
+                    SpmmStatusEnum::PushSignal(_rid, signal) => unsafe {
+                        if shared_status
+                            .shared_buffer_status
+                            .can_receive(&self.buffer_status_id, signal.target_id)
+                        {
+                            let finished = shared_status.shared_buffer_status.receive(
+                                &self.buffer_status_id,
+                                signal.target_id,
+                                signal.self_sender_id,
+                            );
+                            yield original_status.clone_with_state(
+                                SpmmStatusEnum::PushReadyQueueId(
+                                    self.queue_id_ready_out,
+                                    (signal.self_queue_id, finished),
+                                ),
+                            );
+                        } else {
+                            // cannot receive now, store it and resume it later
+                            temp_signal_queue.push_back(signal);
+                        }
+                    },
+                    SpmmStatusEnum::PushBufferPopSignal(_rid) => {
+                        // a buffer entry is popped, resume the signal
+                        while let Some(signal) = temp_signal_queue.pop_front() {
+                            if unsafe {
+                                shared_status
+                                    .shared_buffer_status
+                                    .can_receive(&self.buffer_status_id, signal.target_id)
+                            } {
+                                let finished = unsafe {
+                                    shared_status.shared_buffer_status.receive(
+                                        &self.buffer_status_id,
+                                        signal.target_id,
+                                        signal.self_sender_id,
+                                    )
+                                };
+                                yield original_status.clone_with_state(
+                                    SpmmStatusEnum::PushReadyQueueId(
+                                        self.queue_id_ready_out,
+                                        (signal.self_queue_id, finished),
+                                    ),
+                                );
+                            } else {
+                                // cannot receive now, store it and resume it later
+                                temp_signal_queue.push_front(signal);
+                                break;
+                            }
+                        }
+                    }
+                    _ => {
+                        panic!("error!")
+                    }
+                };
             }
         })
     }

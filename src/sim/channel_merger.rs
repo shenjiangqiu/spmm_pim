@@ -4,17 +4,23 @@
 
 use desim::ResourceId;
 
-use super::{merger_task_sender::*, BankID, sim_time::{NamedTimeId, LevelTimeId}};
+use super::{
+    buffer_status::BufferStatusId,
+    merger_status::MergerStatusId,
+    merger_task_sender::*,
+    sim_time::{LevelTimeId, NamedTimeId},
+    BankID,
+};
 pub struct ChannelMerger {
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
     pub merger_resouce: ResourceId,
 
     // settings
-    pub merger_status_id: usize,
+    pub merger_status_id: MergerStatusId,
     pub self_level_time_id: LevelTimeId,
-
-    pub sim_time:NamedTimeId,
+    pub buffer_status_id: BufferStatusId,
+    pub sim_time: NamedTimeId,
 }
 
 impl ChannelMerger {
@@ -22,9 +28,10 @@ impl ChannelMerger {
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
         merger_resouce: ResourceId,
-        merger_status_id: usize,
+        merger_status_id: MergerStatusId,
         self_level_time_id: LevelTimeId,
-        sim_time:NamedTimeId,
+        sim_time: NamedTimeId,
+        buffer_status_id: BufferStatusId,
     ) -> Self {
         Self {
             task_in,
@@ -33,6 +40,7 @@ impl ChannelMerger {
             merger_status_id,
             self_level_time_id,
             sim_time,
+            buffer_status_id,
         }
     }
 }
@@ -49,8 +57,8 @@ impl MergerTaskSender for ChannelMerger {
     fn get_merger_resouce_id(&self) -> ResourceId {
         self.merger_resouce
     }
-    fn get_merger_status_id(&self) -> usize {
-        self.merger_status_id
+    fn get_merger_status_id(&self) -> &MergerStatusId {
+        &self.merger_status_id
     }
 
     fn get_lower_pes(&self) -> &[ResourceId] {
@@ -59,5 +67,9 @@ impl MergerTaskSender for ChannelMerger {
 
     fn get_time_id(&self) -> &NamedTimeId {
         &self.sim_time
+    }
+
+    fn get_buffer_id(&self) -> &super::buffer_status::BufferStatusId {
+        &self.buffer_status_id
     }
 }

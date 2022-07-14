@@ -1,5 +1,5 @@
 pub mod bank;
-mod buffer_status;
+pub mod buffer_status;
 pub mod channel_merger;
 pub mod chip_merger;
 pub mod component;
@@ -17,15 +17,16 @@ pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
+
+mod merger_status;
 use desim::{
     prelude::*,
     resources::{CopyDefault, SimpleResource, Store},
 };
 use enum_as_inner::EnumAsInner;
-use hdrhistogram::Histogram;
 use id_translation::*;
 use itertools::Itertools;
-use log::{debug, info};
+use log::debug;
 use sprs::CsMat;
 use std::{cell::RefCell, collections::BTreeMap, ops::Generator, path::Path, rc::Rc};
 
@@ -37,12 +38,14 @@ use self::{
     component::Component,
     dimm_merger::DimmMerger,
     final_receiver::FinalReceiver,
+    full_result_merger_worker::FullResultMergerWorker,
+    merger_status::SharedMergerStatus,
     merger_task_dispather::MergerWorkerDispatcher,
     merger_task_sender::FullMergerStatus,
-    merger_task_worker::MergerWorker,
-    sim_time::{
-        ComponentTime, LevelTime, LevelTimeId, NamedTimeId, SharedNamedTime, SharedSimTime,
-    },
+    partial_sum_collector::PartialSumCollector,
+    partial_sum_sender::PartialSumSender,
+    partial_sum_signal_collector::PartialSumSignalCollector,
+    sim_time::{ComponentTime, LevelTime, LevelTimeId, SharedNamedTime, SharedSimTime},
     task_sender::TaskSender,
 };
 use crate::{csv_nodata::CsVecNodata, settings::MemSettings, two_matrix::TwoMatrix};
@@ -102,11 +105,28 @@ pub enum SpmmStatusEnum {
     PushPartialTask(ResourceId, PartialResultTaskType),
     PushReadBankTask(ResourceId, BankReadRowTaskType),
     PushSignal(ResourceId, PartialSignal),
-    PushReadyQueueId(ResourceId, usize),
+    /// (queue_id, is_last)
+    PushReadyQueueId(ResourceId, (usize, bool)),
     PushFullPartialTask(ResourceId, FullTaskType),
-    Acquire(ResourceId),
-    Release(ResourceId),
+    PushBufferPopSignal(ResourceId),
     Pop(ResourceId),
+}
+
+/// all the shared status that can be modified by all processes
+#[derive(Debug, Clone, Default)]
+pub struct SharedStatus {
+    // fix here, this one is not used because we use buffer status to store the status
+    // pub shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
+    pub shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
+    pub shared_sim_time: Rc<SharedSimTime>,
+    pub shared_level_time: Rc<LevelTime>,
+    pub shared_named_time: Rc<SharedNamedTime>,
+    pub shared_buffer_status: Rc<SharedBufferStatus>,
+    pub shared_merger_status: Rc<SharedMergerStatus>,
+}
+pub struct StateWithSharedStatus {
+    pub status: SpmmStatusEnum,
+    pub shared_status: SharedStatus,
 }
 
 #[derive(Debug, Clone)]
@@ -115,90 +135,49 @@ pub struct SpmmStatus {
 
     // bank pe to task mapping:
     pub enable_log: bool,
-    pub shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
-    pub shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
-    pub shared_sim_time: Rc<SharedSimTime>,
-    pub shared_level_time: Rc<LevelTime>,
-    pub shared_comp_time: Rc<SharedNamedTime>,
-    pub shared_buffer_status: Rc<SharedBufferStatus>,
+    pub shared_status: SharedStatus,
 }
 impl CopyDefault for SpmmStatus {
     fn copy_default(&self) -> Self {
         let enable_log = self.enable_log;
 
-        let shared_merger_status = self.shared_merger_status.clone();
-        let shared_bankpe_status = self.shared_bankpe_status.clone();
-        let shared_sim_time = self.shared_sim_time.clone();
-        let shared_level_time = self.shared_level_time.clone();
-        let shared_comp_time = self.shared_comp_time.clone();
-        let shared_buffer_status = self.shared_buffer_status.clone();
+        let shared_status = self.shared_status.clone();
         Self {
             state: SpmmStatusEnum::Continue,
             enable_log,
-            shared_merger_status,
-            shared_bankpe_status,
-            shared_sim_time,
-            shared_level_time,
-            shared_comp_time,
-            shared_buffer_status,
+            shared_status,
         }
     }
 }
 
-type StatusTuple = (
-    bool,
-    SpmmStatusEnum,
-    Rc<RefCell<merger_task_sender::FullMergerStatus>>,
-    Rc<RefCell<BTreeMap<PeID, usize>>>,
-    Rc<LevelTime>,
-    Rc<SharedNamedTime>,
-    Rc<SharedBufferStatus>,
-);
-
 impl SpmmStatus {
-    pub fn new(
-        state: SpmmStatusEnum,
-        shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
-        shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
-        shared_sim_time: Rc<SharedSimTime>,
-        shared_level_time: Rc<LevelTime>,
-        shared_comp_time: Rc<SharedNamedTime>,
-        shared_buffer_status: Rc<SharedBufferStatus>,
-    ) -> Self {
+    pub fn new(state: SpmmStatusEnum, shared_status: SharedStatus) -> Self {
         Self {
             state,
             enable_log: false,
-            shared_merger_status,
-            shared_bankpe_status,
-            shared_sim_time,
-            shared_level_time,
-            shared_comp_time,
-            shared_buffer_status,
+            shared_status,
         }
     }
-    pub fn get_target_pe_from_target_row(
-        &self,
-        status_id: usize,
-        target_row: usize,
-    ) -> Option<usize> {
-        self.shared_merger_status
-            .borrow()
-            .get_merger_status(status_id)
-            .current_working_merger
-            .get(&target_row)
-            .cloned()
-    }
+    // this function is not used any more, because we use buffer status to store the status
+    // pub fn get_target_pe_from_target_row(
+    //     &self,
+    //     status_id: usize,
+    //     target_row: usize,
+    // ) -> Option<usize> {
+    //     self.shared_status
+    //         .shared_merger_status
+    //         .borrow()
+    //         .get_merger_status(status_id)
+    //         .current_working_merger
+    //         .get(&target_row)
+    //         .cloned()
+    // }
 
     pub fn clone_with_state(&self, state: SpmmStatusEnum) -> Self {
         Self {
             state,
             enable_log: self.enable_log,
-            shared_merger_status: self.shared_merger_status.clone(),
-            shared_bankpe_status: self.shared_bankpe_status.clone(),
-            shared_sim_time: self.shared_sim_time.clone(),
-            shared_level_time: self.shared_level_time.clone(),
-            shared_comp_time: self.shared_comp_time.clone(),
-            shared_buffer_status: self.shared_buffer_status.clone(),
+            shared_status: self.shared_status.clone(),
         }
     }
 
@@ -209,39 +188,22 @@ impl SpmmStatus {
         Self { enable_log, ..self }
     }
 
-    pub fn new_log(
-        state: SpmmStatusEnum,
-        shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
-        shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
-        shared_sim_time: Rc<SharedSimTime>,
-        shared_level_time: Rc<LevelTime>,
-        shared_comp_time: Rc<SharedNamedTime>,
-        shared_buffer_status: Rc<SharedBufferStatus>,
-    ) -> Self {
+    pub fn new_log(state: SpmmStatusEnum, shared_status: SharedStatus) -> Self {
         Self {
             state,
             enable_log: true,
-            shared_merger_status,
-            shared_bankpe_status,
-            shared_sim_time,
-            shared_level_time,
-            shared_comp_time,
-            shared_buffer_status,
+            shared_status,
         }
     }
     pub fn state(&self) -> &SpmmStatusEnum {
         &self.state
     }
-    pub fn into_inner(self) -> StatusTuple {
-        (
-            self.enable_log,
-            self.state,
-            self.shared_merger_status,
-            self.shared_bankpe_status,
-            self.shared_level_time,
-            self.shared_comp_time,
-            self.shared_buffer_status,
-        )
+
+    pub fn into_inner(self) -> StateWithSharedStatus {
+        StateWithSharedStatus {
+            status: self.state,
+            shared_status: self.shared_status,
+        }
     }
 }
 #[derive(Debug, Clone, EnumAsInner, PartialEq, Eq, PartialOrd, Ord)]
@@ -274,11 +236,10 @@ impl SimState for SpmmStatus {
             SpmmStatusEnum::Pop(rid) => Effect::Pop(*rid),
             SpmmStatusEnum::PushPartialTask(rid, _) => Effect::Push(*rid),
             SpmmStatusEnum::PushReadBankTask(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::Acquire(rid) => Effect::Request(*rid),
-            SpmmStatusEnum::Release(rid) => Effect::Release(*rid),
             SpmmStatusEnum::PushSignal(rid, _) => Effect::Push(*rid),
             SpmmStatusEnum::PushReadyQueueId(rid, _) => Effect::Push(*rid),
             SpmmStatusEnum::PushFullPartialTask(rid, _) => Effect::Push(*rid),
+            SpmmStatusEnum::PushBufferPopSignal(rid) => Effect::Push(*rid),
         }
     }
 
@@ -301,51 +262,83 @@ enum SimulationResult {
 }
 /// # safety:
 /// the comp_ids should all be valid!
-unsafe fn calculate_raition_rate(
-    end_time: f64,
-    comp_ids: &[usize],
-    shared_comp_time: &ComponentTime,
-) -> f64 {
-    let total_time = end_time * comp_ids.len() as f64;
-    let idle_time = comp_ids
-        .iter()
-        .map(|comp_id| {
-            shared_comp_time
-                .get_idle_time(*comp_id)
-                .1
-                .iter()
-                .sum::<f64>()
-        })
-        .sum::<f64>();
-    idle_time / total_time
-}
+// unsafe fn calculate_raition_rate(
+//     end_time: f64,
+//     comp_ids: &[usize],
+//     shared_comp_time: &ComponentTime,
+// ) -> f64 {
+//     let total_time = end_time * comp_ids.len() as f64;
+//     let idle_time = comp_ids
+//         .iter()
+//         .map(|comp_id| {
+//             shared_comp_time
+//                 .get_idle_time(*comp_id)
+//                 .1
+//                 .iter()
+//                 .sum::<f64>()
+//         })
+//         .sum::<f64>();
+//     idle_time / total_time
+// }
 
 fn build_dimm(
     mem_settings: &MemSettings,
     store_size: usize,
-    merger_status: Rc<RefCell<FullMergerStatus>>,
     sim: &mut Simulation<SpmmStatus>,
-    shared_comp_time: Rc<SharedNamedTime>,
     task_send_store: usize,
     status: SpmmStatus,
-    final_receiver_resouce: usize,
+    final_receiver_signal: usize,
     dimm_level_id: LevelTimeId,
     channel_level_id: LevelTimeId,
     chip_level_id: LevelTimeId,
     bank_level_id: LevelTimeId,
 ) -> eyre::Result<()> {
+    let shared_status = status.shared_status.clone();
     // 2. add the Dimm
     let num_channels = mem_settings.channels;
     let channel_stores = (0..num_channels)
         .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
         .collect_vec();
-    let merger_status_id = merger_status
-        .borrow_mut()
-        .create_merger_status(mem_settings.dimm_merger_count);
+    let merger_status_id = shared_status
+        .shared_merger_status
+        .add_component(mem_settings.dimm_merger_count);
     let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
         mem_settings.dimm_merger_count,
     )));
-    let sim_time_id = shared_comp_time.add_component_with_name("DIMMSENDER_GETID");
+    let sim_time_id = shared_status
+        .shared_named_time
+        .add_component_with_name("DIMMSENDER_GETID");
+    let buffer_status_id = shared_status
+        .shared_buffer_status
+        .add_component(mem_settings.dimm_merger_count);
+
+    let merger_to_sender_queue = sim.create_resource(Box::new(Store::new(1)));
+    let dimm_signal_sender = PartialSumSender {
+        queue_id_partial_sum_in: merger_to_sender_queue,
+        queue_id_partial_sum_out: sim.create_resource(Box::new(Store::new(1))),
+        queue_id_signal_out: final_receiver_signal,
+    };
+    let proc = sim.create_process(dimm_signal_sender.run());
+    sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+    let signal_in = sim.create_resource(Box::new(Store::new(1)));
+    let ready_id_queue = sim.create_resource(Box::new(Store::new(1)));
+    let dimm_signal_collector = PartialSumSignalCollector {
+        queue_id_signal_in: signal_in,
+        queue_id_ready_out: ready_id_queue,
+        buffer_status_id,
+    };
+    let proc = sim.create_process(dimm_signal_collector.run());
+    sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+
+    let collector_to_dispatcher = sim.create_resource(Box::new(Store::new(store_size)));
+
+    let dimm_partial_sum_data_collector = PartialSumCollector {
+        queue_id_ready_in: ready_id_queue,
+        queue_id_full_result_out: collector_to_dispatcher,
+        queue_id_pop_signal_out: signal_in,
+    };
+    let proc = sim.create_process(dimm_partial_sum_data_collector.run());
+    sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
 
     let dimm = DimmMerger::new(
         task_send_store,
@@ -353,37 +346,35 @@ fn build_dimm(
         merger_resouce_id,
         merger_status_id,
         sim_time_id,
+        buffer_status_id,
     );
+
     let id = sim.create_process(dimm.run());
     sim.schedule_event(0., id, status.clone());
 
     // create the merger_task_worker
     let mut task_receiver = vec![];
     for i in 0..mem_settings.dimm_merger_count {
-        let resouce = sim.create_resource(Box::new(Store::new(store_size)));
-        let comp_id = shared_comp_time.add_component_with_name(format!("dimm-{i}"));
+        let full_partial_sum_in = sim.create_resource(Box::new(Store::new(store_size)));
 
-        let merger_task_worker = MergerWorker {
-            merger_size: mem_settings.dimm_merger_size,
+        let merger_task_worker = FullResultMergerWorker {
+            id: i,
+            queue_id_partial_sum_sender: merger_to_sender_queue,
+            queue_id_partial_sum_in: full_partial_sum_in,
+            self_sender_id: task_send_store,
             merger_status_id,
-            merger_work_resource: merger_resouce_id,
-            partial_sum_sender: final_receiver_resouce,
-            task_reciever: resouce,
-            task_sender_input_id: task_send_store,
-            level_time: dimm_level_id,
-            time_id: comp_id,
+            merger_width: mem_settings.dimm_merger_size,
         };
         let id = sim.create_process(merger_task_worker.run());
         sim.schedule_event(0., id, status.clone());
-        task_receiver.push(resouce);
+        task_receiver.push(full_partial_sum_in);
     }
 
     // create the dimm merger_task_dispatcher
-    let dimm_merger_worker_task_in = sim.create_resource(Box::new(Store::new(store_size)));
     let merger_task_dispatcher = MergerWorkerDispatcher {
         merger_status_id,
         merger_task_sender: task_receiver,
-        partial_sum_task_in: dimm_merger_worker_task_in,
+        full_sum_in: collector_to_dispatcher,
     };
 
     let id = sim.create_process(merger_task_dispatcher.run());
@@ -391,34 +382,33 @@ fn build_dimm(
 
     build_channel(
         mem_settings,
-        merger_status,
         sim,
-        shared_comp_time,
         status,
         store_size,
         channel_level_id,
         chip_level_id,
         bank_level_id,
         channel_stores,
-        dimm_merger_worker_task_in,
+        signal_in,
     )?;
     Ok(())
 }
+
 fn build_channel(
     mem_settings: &MemSettings,
-    merger_status: Rc<RefCell<FullMergerStatus>>,
     sim: &mut Simulation<SpmmStatus>,
-    shared_comp_time: Rc<SharedNamedTime>,
     status: SpmmStatus,
     store_size: usize,
     channel_level_id: LevelTimeId,
     chip_level_id: LevelTimeId,
     bank_level_id: LevelTimeId,
-    channel_stores: Vec<usize>,
-    dimm_in: usize,
+    channel_task_senders: Vec<usize>,
+    dimm_signal_in: usize,
 ) -> eyre::Result<()> {
+    let shared_status = status.shared_status.clone();
+
     // 3. add the Channel
-    for (channel_id, store_id) in channel_stores.into_iter().enumerate() {
+    for (channel_id, dimm_to_channel_task_sender) in channel_task_senders.into_iter().enumerate() {
         // create the channel!
         let num_chips = mem_settings.chips;
 
@@ -427,22 +417,54 @@ fn build_channel(
             .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
             .collect_vec();
 
-        let merger_status_id = merger_status
-            .borrow_mut()
-            .create_merger_status(mem_settings.channel_merger_count);
+        let merger_status_id = shared_status
+            .shared_merger_status
+            .add_component(mem_settings.channel_merger_count);
         let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
             mem_settings.channel_merger_count,
         )));
 
-        let sim_time = shared_comp_time.add_component_with_name("channel_sender");
+        let sim_time = shared_status
+            .shared_named_time
+            .add_component_with_name("channel_sender");
+        let buffer_status_id = shared_status
+            .shared_buffer_status
+            .add_component(mem_settings.channel_merger_count);
+
+        let merger_to_sender_queue = sim.create_resource(Box::new(Store::new(1)));
+        let channel_signal_sender = PartialSumSender {
+            queue_id_partial_sum_in: merger_to_sender_queue,
+            queue_id_partial_sum_out: sim.create_resource(Box::new(Store::new(1))),
+            queue_id_signal_out: dimm_signal_in,
+        };
+        let proc = sim.create_process(channel_signal_sender.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+        let signal_in = sim.create_resource(Box::new(Store::new(1)));
+        let ready_queueid = sim.create_resource(Box::new(Store::new(1)));
+        let channel_signal_collector = PartialSumSignalCollector {
+            queue_id_signal_in: signal_in,
+            queue_id_ready_out: ready_queueid,
+            buffer_status_id,
+        };
+        let proc = sim.create_process(channel_signal_collector.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+        let collector_to_dispatcher = sim.create_resource(Box::new(Store::new(1)));
+        let channel_partial_sum_data_collector = PartialSumCollector {
+            queue_id_ready_in: ready_queueid,
+            queue_id_full_result_out: collector_to_dispatcher,
+            queue_id_pop_signal_out: signal_in,
+        };
+        let proc = sim.create_process(channel_partial_sum_data_collector.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
 
         let channel = ChannelMerger::new(
-            store_id,
+            dimm_to_channel_task_sender,
             chip_stores.clone(),
             merger_resouce_id,
             merger_status_id,
             channel_level_id,
             sim_time,
+            buffer_status_id,
         );
 
         // create the process
@@ -453,60 +475,53 @@ fn build_channel(
         let mut task_receiver = vec![];
         for i in 0..mem_settings.channel_merger_count {
             let resouce = sim.create_resource(Box::new(Store::new(store_size)));
-            let comp_id = shared_comp_time.add_component_with_name("channel_worker");
 
-            let merger_task_worker = MergerWorker {
-                merger_size: mem_settings.channel_merger_size,
+            let merger_task_worker = FullResultMergerWorker {
+                id: i,
+                queue_id_partial_sum_sender: merger_to_sender_queue,
+                queue_id_partial_sum_in: resouce,
+                self_sender_id: dimm_to_channel_task_sender,
                 merger_status_id,
-                merger_work_resource: merger_resouce_id,
-                partial_sum_sender: dimm_in,
-                task_reciever: resouce,
-                task_sender_input_id: store_id,
-                level_time: channel_level_id,
-                time_id: comp_id,
+                merger_width: mem_settings.channel_merger_size,
             };
             let id = sim.create_process(merger_task_worker.run());
             sim.schedule_event(0., id, status.clone());
             task_receiver.push(resouce);
         }
         // create the channel merger_task_dispatcher
-        let channel_merger_worker_task_in = sim.create_resource(Box::new(Store::new(store_size)));
         let merger_task_dispatcher = MergerWorkerDispatcher {
             merger_status_id,
             merger_task_sender: task_receiver,
-            partial_sum_task_in: channel_merger_worker_task_in,
+            full_sum_in: collector_to_dispatcher,
         };
         let id = sim.create_process(merger_task_dispatcher.run());
         sim.schedule_event(0., id, status.clone());
         build_chip(
             mem_settings,
-            merger_status.clone(),
             sim,
-            shared_comp_time.clone(),
             status.clone(),
             store_size,
             chip_level_id,
             bank_level_id,
             chip_stores,
-            channel_merger_worker_task_in,
             channel_id,
+            signal_in,
         )?;
     }
     Ok(())
 }
 fn build_chip(
     mem_settings: &MemSettings,
-    merger_status: Rc<RefCell<FullMergerStatus>>,
     sim: &mut Simulation<SpmmStatus>,
-    shared_comp_time: Rc<SharedNamedTime>,
     status: SpmmStatus,
     store_size: usize,
     chip_level_id: LevelTimeId,
     bank_level_id: LevelTimeId,
     chip_stores: Vec<usize>,
-    channel_in: usize,
     channel_id: ChannelID,
+    channel_signal_in: usize,
 ) -> eyre::Result<()> {
+    let shared_status = status.shared_status.clone();
     // 4. add the chip
     for (chip_id, store_id) in chip_stores.into_iter().enumerate() {
         // create the chip!
@@ -518,10 +533,43 @@ fn build_chip(
         let merger_resouce_id = sim.create_resource(Box::new(SimpleResource::new(
             mem_settings.chip_merger_count,
         )));
-        let merger_status_id = merger_status
-            .borrow_mut()
-            .create_merger_status(mem_settings.chip_merger_count);
-        let sim_time_id = shared_comp_time.add_component_with_name("chip_sender");
+        let merger_status_id = shared_status
+            .shared_merger_status
+            .add_component(mem_settings.chip_merger_count);
+        let sim_time_id = shared_status
+            .shared_named_time
+            .add_component_with_name("chip_sender");
+        let buffer_status_id = shared_status
+            .shared_buffer_status
+            .add_component(mem_settings.chip_merger_count);
+
+        // build partial sum sender, signal collector and data collector
+        let merger_to_sender_queue = sim.create_resource(Box::new(Store::new(1)));
+        let chip_signal_sender = PartialSumSender {
+            queue_id_partial_sum_in: merger_to_sender_queue,
+            queue_id_partial_sum_out: sim.create_resource(Box::new(Store::new(1))),
+            queue_id_signal_out: channel_signal_in,
+        };
+        let proc = sim.create_process(chip_signal_sender.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+        let signal_in = sim.create_resource(Box::new(Store::new(1)));
+        let ready_queueid = sim.create_resource(Box::new(Store::new(1)));
+        let chip_signal_collector = PartialSumSignalCollector {
+            queue_id_signal_in: signal_in,
+            queue_id_ready_out: ready_queueid,
+            buffer_status_id,
+        };
+        let proc = sim.create_process(chip_signal_collector.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+        let collector_to_dispatcher = sim.create_resource(Box::new(Store::new(1)));
+        let chip_partial_sum_data_collector = PartialSumCollector {
+            queue_id_ready_in: ready_queueid,
+            queue_id_full_result_out: collector_to_dispatcher,
+            queue_id_pop_signal_out: signal_in,
+        };
+        let proc = sim.create_process(chip_partial_sum_data_collector.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+
         let chip = ChipMerger::new(
             store_id,
             bank_stores.clone(),
@@ -529,6 +577,7 @@ fn build_chip(
             merger_status_id,
             chip_level_id,
             sim_time_id,
+            buffer_status_id,
         );
 
         // create the process
@@ -537,19 +586,16 @@ fn build_chip(
 
         // create the merger_task_worker
         let mut task_receiver = vec![];
-        for _i in 0..mem_settings.chip_merger_count {
+        for i in 0..mem_settings.chip_merger_count {
             let resouce = sim.create_resource(Box::new(Store::new(store_size)));
-            let comp_id = shared_comp_time.add_component_with_name("chip_worker");
 
-            let merger_task_worker = MergerWorker {
-                merger_size: mem_settings.chip_merger_size,
+            let merger_task_worker = FullResultMergerWorker {
+                id: i,
+                queue_id_partial_sum_sender: merger_to_sender_queue,
+                queue_id_partial_sum_in: resouce,
+                self_sender_id: store_id,
                 merger_status_id,
-                merger_work_resource: merger_resouce_id,
-                partial_sum_sender: channel_in,
-                task_reciever: resouce,
-                task_sender_input_id: store_id,
-                level_time: chip_level_id,
-                time_id: comp_id,
+                merger_width: mem_settings.chip_merger_size,
             };
             let id = sim.create_process(merger_task_worker.run());
             sim.schedule_event(0., id, status.clone());
@@ -560,7 +606,7 @@ fn build_chip(
         let merger_task_dispatcher = MergerWorkerDispatcher {
             merger_status_id,
             merger_task_sender: task_receiver,
-            partial_sum_task_in: chip_merger_worker_task_in,
+            full_sum_in: chip_merger_worker_task_in,
         };
         let id = sim.create_process(merger_task_dispatcher.run());
         sim.schedule_event(0., id, status.clone());
@@ -568,13 +614,12 @@ fn build_chip(
         build_bank(
             mem_settings,
             sim,
-            shared_comp_time.clone(),
             status.clone(),
             store_size,
             bank_level_id,
             bank_stores,
-            chip_merger_worker_task_in,
             chip_id,
+            signal_in,
         )?;
     }
     // start
@@ -586,14 +631,14 @@ fn build_chip(
 fn build_bank(
     mem_settings: &MemSettings,
     sim: &mut Simulation<SpmmStatus>,
-    shared_comp_time: Rc<SharedNamedTime>,
     status: SpmmStatus,
     store_size: usize,
     _bank_level_id: LevelTimeId,
     bank_stores: Vec<usize>,
-    chip_in: usize,
     chip_id: ChipID,
+    chip_signal_in: usize,
 ) -> eyre::Result<()> {
+    let shared_status = status.shared_status.clone();
     // 5. add the bank
     for (bank_id, store_id) in bank_stores.into_iter().enumerate() {
         // create the bank!
@@ -603,7 +648,19 @@ fn build_bank(
             .map(|_i| sim.create_resource(Box::new(Store::new(store_size))))
             .collect_vec();
 
-        let comp_id = shared_comp_time.add_component_with_name("bank_sender");
+        // create the partial sum sender, signal collector and data collector
+        let merger_to_sender = sim.create_resource(Box::new(Store::new(1)));
+        let bank_signal_sender = PartialSumSender {
+            queue_id_partial_sum_in: merger_to_sender,
+            queue_id_partial_sum_out: sim.create_resource(Box::new(Store::new(1))),
+            queue_id_signal_out: chip_signal_in,
+        };
+        let proc = sim.create_process(bank_signal_sender.run());
+        sim.schedule_event(0., proc, status.clone_with_state(SpmmStatusEnum::Continue));
+
+        let comp_id = shared_status
+            .shared_named_time
+            .add_component_with_name("bank_sender");
         let bank = BankTaskReorder::new(
             store_id,
             bank_pe_stores.clone(),
@@ -618,11 +675,13 @@ fn build_bank(
         sim.schedule_event(0., id, status.clone());
 
         for bank_pe_store_id in bank_pe_stores {
-            let comp_id = shared_comp_time.add_component_with_name("33");
+            let comp_id = shared_status
+                .shared_named_time
+                .add_component_with_name("33");
 
             let bank_pe = BankPe::new(
                 bank_pe_store_id,
-                chip_in,
+                merger_to_sender,
                 mem_settings.bank_merger_size,
                 mem_settings.bank_adder_size,
                 store_id,
@@ -650,7 +709,7 @@ impl Simulator {
         // 1.---- the basic data
         debug!("start to run");
         let mut sim = Simulation::new();
-        let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
+        // let merger_status = Rc::new(RefCell::new(FullMergerStatus::new()));
         let bankpe_status = Rc::new(RefCell::new(BTreeMap::new()));
         let shared_level_time = Rc::new(LevelTime::new());
 
@@ -659,18 +718,19 @@ impl Simulator {
         let chip_level_id = shared_level_time.add_level();
         let bank_level_id = shared_level_time.add_level();
 
-        let shared_comp_time = Rc::new(SharedNamedTime::new());
+        let shared_named_time = Rc::new(SharedNamedTime::new());
         let shared_buffer_status = Rc::new(SharedBufferStatus::default());
         let sim_time = Rc::new(SharedSimTime::new());
-        let status = SpmmStatus::new(
-            SpmmStatusEnum::Continue,
-            merger_status.clone(),
-            bankpe_status,
-            sim_time,
+        let merger_status = Default::default();
+        let shared_status = SharedStatus {
+            shared_bankpe_status: bankpe_status,
+            shared_sim_time: sim_time,
             shared_level_time,
-            shared_comp_time.clone(),
+            shared_named_time,
             shared_buffer_status,
-        );
+            shared_merger_status: merger_status,
+        };
+        let status = SpmmStatus::new(SpmmStatusEnum::Continue, shared_status.clone());
 
         let final_receiver_resouce = sim.create_resource(Box::new(Store::new(store_size)));
         let final_rev = FinalReceiver {
@@ -695,11 +755,9 @@ impl Simulator {
         build_dimm(
             mem_settings,
             store_size,
-            merger_status,
             &mut sim,
-            shared_comp_time.clone(),
             task_send_store,
-            status,
+            status.clone(),
             final_receiver_resouce,
             dimm_level_id,
             channel_level_id,
@@ -708,7 +766,7 @@ impl Simulator {
         )?;
         let sim = sim.run(EndCondition::NoEvents);
         let time = sim.time();
-        shared_comp_time.show_data(time);
+        status.shared_status.shared_named_time.show_data(time);
 
         Ok(())
     }
@@ -752,15 +810,7 @@ mod test {
             yield status.clone_with_state(SpmmStatusEnum::PushBankTask(queue2, Default::default()));
         }));
 
-        let status = SpmmStatus::new(
-            SpmmStatusEnum::Continue,
-            Rc::new(RefCell::new(merger_task_sender::FullMergerStatus::new())),
-            Rc::new(RefCell::new(BTreeMap::new())),
-            Rc::new(SharedSimTime::new()),
-            Rc::new(LevelTime::new()),
-            Rc::new(SharedNamedTime::new()),
-            Rc::new(SharedBufferStatus::default()),
-        );
+        let status = SpmmStatus::new(SpmmStatusEnum::Continue, SharedStatus::default());
         sim.schedule_event(0., process1, status.copy_default());
         sim.schedule_event(0., process2, status.copy_default());
         let sim = sim.run(EndCondition::NoEvents);
@@ -773,7 +823,7 @@ mod test {
     #[test]
     fn sim_test() {
         // ---- first create neccessary status structures
-        let config_str = include_str!("../../log_config.yml");
+        let config_str = include_str!("../../log_config_debug.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
 

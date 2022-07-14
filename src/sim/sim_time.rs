@@ -95,7 +95,7 @@ impl NamedTime {
     }
 
     fn show_data(&self, sim_time: f64) {
-        let total_time: f64 = self.data.iter().map(|(n, t)| t).sum();
+        let total_time: f64 = self.data.iter().map(|(_n, t)| t).sum();
         for (name, time) in self.data.iter() {
             println!(
                 "{}: {}: {:.1}% :{:.1}%",
