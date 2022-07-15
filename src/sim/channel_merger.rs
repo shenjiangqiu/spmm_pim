@@ -14,7 +14,6 @@ use super::{
 pub struct ChannelMerger {
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
-    pub merger_resouce: ResourceId,
 
     // settings
     pub merger_status_id: MergerStatusId,
@@ -27,7 +26,6 @@ impl ChannelMerger {
     pub fn new(
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
-        merger_resouce: ResourceId,
         merger_status_id: MergerStatusId,
         self_level_time_id: LevelTimeId,
         sim_time: NamedTimeId,
@@ -36,7 +34,6 @@ impl ChannelMerger {
         Self {
             task_in,
             lower_pes,
-            merger_resouce,
             merger_status_id,
             self_level_time_id,
             sim_time,
@@ -55,7 +52,7 @@ impl MergerTaskSender for ChannelMerger {
     }
 
     fn get_merger_resouce_id(&self) -> ResourceId {
-        self.merger_resouce
+        panic!("not implemented");
     }
     fn get_merger_status_id(&self) -> &MergerStatusId {
         &self.merger_status_id

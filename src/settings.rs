@@ -57,6 +57,9 @@ pub struct MemSettings {
 
     // the store buffer size
     pub store_size: usize,
+
+    // buffer lines
+    pub buffer_lines: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

@@ -151,6 +151,8 @@ impl Component for BankPe {
                 }
                 match bank_task {
                     BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
+                        debug!("BANK_PE: receive task: to: row: {},{:?}", to, row);
+
                         tasks.push(row);
                         current_task = to;
                     }
@@ -169,6 +171,12 @@ impl Component for BankPe {
                             let (_time, status) = context.into_inner();
                             current_time = _time;
                             // this could be idle due to upper pressure
+                            debug!(
+                                "BANK_PE: wait time: {:?} and push to sender: {:?}, the task:{:?}",
+                                wait_time,
+                                self.partial_out,
+                                (current_task, self.task_sender_input_id, &data)
+                            );
                             let context =
                                 yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                                     self.partial_out,

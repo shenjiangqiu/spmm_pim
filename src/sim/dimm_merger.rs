@@ -11,7 +11,6 @@ use super::{
 pub struct DimmMerger {
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
-    pub merger_resouce: ResourceId,
 
     // settings
     pub merger_status_id: MergerStatusId,
@@ -24,7 +23,6 @@ impl DimmMerger {
     pub fn new(
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
-        merger_resouce: ResourceId,
         merger_status_id: MergerStatusId,
         time_id: NamedTimeId,
         buffer_status_id: BufferStatusId,
@@ -32,7 +30,6 @@ impl DimmMerger {
         Self {
             task_in,
             lower_pes,
-            merger_resouce,
             merger_status_id,
             time_id,
             buffer_status_id,
@@ -50,7 +47,7 @@ impl MergerTaskSender for DimmMerger {
     }
 
     fn get_merger_resouce_id(&self) -> ResourceId {
-        self.merger_resouce
+        panic!("not implemented");
     }
     fn get_merger_status_id(&self) -> &MergerStatusId {
         &self.merger_status_id

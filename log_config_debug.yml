@@ -6,11 +6,11 @@ appenders:
 
     file:
       kind: file
-      path: log/spmm_log.log
+      path: log/spmm_log_debug.log
       append: false
     rolling_file:
         kind: rolling_file
-        path: log/spmm_rolling.log
+        path: log/spmm_rolling_debug.log
         append: true
         encoder:
           pattern: "{d(%+)(utc)} [{f}:{L}] {h({l})} {M}:{m}{n}"
@@ -21,7 +21,7 @@ appenders:
             limit: 10Mb
           roller:
             kind: fixed_window
-            pattern: log/spmm_rolling.{}.log
+            pattern: log/spmm_rolling_debug.{}.log
             count: 5
             base: 1
 

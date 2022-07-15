@@ -4,12 +4,15 @@
 
 use std::collections::VecDeque;
 
+use log::debug;
+
 use super::{
-    buffer_status::BufferStatusId, component::Component, SpmmContex, SpmmStatusEnum,
+    buffer_status::BufferStatusId, component::Component, LevelId, SpmmContex, SpmmStatusEnum,
     StateWithSharedStatus,
 };
 
 pub struct PartialSumSignalCollector {
+    pub level_id: LevelId,
     pub queue_id_signal_in: usize,
     pub queue_id_ready_out: usize,
 
@@ -38,15 +41,22 @@ impl Component for PartialSumSignalCollector {
                     shared_status,
                 } = signal_status.into_inner();
                 match status {
-                    SpmmStatusEnum::PushSignal(_rid, signal) => unsafe {
-                        if shared_status
-                            .shared_buffer_status
-                            .can_receive(&self.buffer_status_id, signal.target_id)
-                        {
-                            let finished = shared_status.shared_buffer_status.receive(
-                                &self.buffer_status_id,
-                                signal.target_id,
-                                signal.self_sender_id,
+                    SpmmStatusEnum::PushSignal(_rid, signal) => {
+                        if unsafe {
+                            shared_status
+                                .shared_buffer_status
+                                .can_receive(&self.buffer_status_id, signal.target_id)
+                        } {
+                            let finished = unsafe {
+                                shared_status.shared_buffer_status.receive(
+                                    &self.buffer_status_id,
+                                    signal.target_id,
+                                    signal.self_sender_id,
+                                )
+                            };
+                            debug!(
+                                "PartialSumSignalCollector-{:?}: receive PushSignal:{:?}",
+                                self.level_id, signal
                             );
                             yield original_status.clone_with_state(
                                 SpmmStatusEnum::PushReadyQueueId(
@@ -54,12 +64,22 @@ impl Component for PartialSumSignalCollector {
                                     (signal.self_queue_id, finished),
                                 ),
                             );
+                            debug!(
+                                "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?}",
+                                self.level_id,
+                                (signal.self_queue_id, finished)
+                            );
                         } else {
                             // cannot receive now, store it and resume it later
+                            debug!("PartialSumSignalCollector-{:?}: receive PushSignal:{:?} but cannot send now",self.level_id, signal);
                             temp_signal_queue.push_back(signal);
                         }
-                    },
+                    }
                     SpmmStatusEnum::PushBufferPopSignal(_rid) => {
+                        debug!(
+                            "PartialSumSignalCollector-{:?}: receive PushBufferPopSignal",
+                            self.level_id
+                        );
                         // a buffer entry is popped, resume the signal
                         while let Some(signal) = temp_signal_queue.pop_front() {
                             if unsafe {
@@ -74,11 +94,20 @@ impl Component for PartialSumSignalCollector {
                                         signal.self_sender_id,
                                     )
                                 };
+                                debug!(
+                                    "PartialSumSignalCollector-{:?}: invoke PushSignal:{:?}",
+                                    self.level_id, signal
+                                );
                                 yield original_status.clone_with_state(
                                     SpmmStatusEnum::PushReadyQueueId(
                                         self.queue_id_ready_out,
                                         (signal.self_queue_id, finished),
                                     ),
+                                );
+                                debug!(
+                                    "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?}",
+                                    self.level_id,
+                                    (signal.self_queue_id, finished)
                                 );
                             } else {
                                 // cannot receive now, store it and resume it later
@@ -88,7 +117,7 @@ impl Component for PartialSumSignalCollector {
                         }
                     }
                     _ => {
-                        panic!("error!")
+                        panic!("PartialSumSignalCollector-{:?}: error!", self.level_id)
                     }
                 };
             }
