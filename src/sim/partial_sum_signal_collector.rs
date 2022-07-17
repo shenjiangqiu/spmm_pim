@@ -10,7 +10,8 @@ use super::{
     buffer_status::BufferStatusId, component::Component, LevelId, SpmmContex, SpmmStatusEnum,
     StateWithSharedStatus,
 };
-
+/// # the signal collector and decide which row to be fetched
+#[derive(Debug)]
 pub struct PartialSumSignalCollector {
     pub level_id: LevelId,
     pub queue_id_signal_in: usize,
@@ -77,10 +78,11 @@ impl Component for PartialSumSignalCollector {
                     }
                     SpmmStatusEnum::PushBufferPopSignal(_rid) => {
                         debug!(
-                            "PartialSumSignalCollector-{:?}: receive PushBufferPopSignal",
-                            self.level_id
+                            "PartialSumSignalCollector-{:?}: receive PushBufferPopSignal,current_queue:{:?},start to test",
+                            self.level_id,temp_signal_queue
                         );
                         // a buffer entry is popped, resume the signal
+
                         while let Some(signal) = temp_signal_queue.pop_front() {
                             if unsafe {
                                 shared_status
@@ -111,6 +113,7 @@ impl Component for PartialSumSignalCollector {
                                 );
                             } else {
                                 // cannot receive now, store it and resume it later
+                                debug!("PartialSumSignalCollector-{:?}: invoke PushSignal:{:?} but cannot send now",self.level_id, signal);
                                 temp_signal_queue.push_front(signal);
                                 break;
                             }

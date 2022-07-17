@@ -7,7 +7,8 @@ use desim::ResourceId;
 use log::debug;
 
 use super::{
-    component::Component, sim_time::NamedTimeId, BankID, BankTask, SpmmContex, SpmmStatusEnum,
+    component::Component, sim_time::NamedTimeId, BankID, BankTask, LevelId, SpmmContex,
+    SpmmStatusEnum,
 };
 use crate::{
     pim::merge_rows_into_one,
@@ -83,7 +84,10 @@ impl FullBankMergerStatus {
 }
 
 /// BankPe is a component that can receive tasks from chip and perform merge
+#[derive(Debug)]
 pub struct BankPe {
+    pub level_id: LevelId,
+    pub pe_id: usize,
     // settings
     pub merger_size: usize,
     pub adder_size: usize,
@@ -99,6 +103,8 @@ pub struct BankPe {
 
 impl BankPe {
     pub fn new(
+        level_id: LevelId,
+        pe_id: usize,
         task_in: ResourceId,
         partial_out: ResourceId,
         merger_size: usize,
@@ -107,6 +113,8 @@ impl BankPe {
         named_idle_time_id: NamedTimeId,
     ) -> Self {
         Self {
+            level_id,
+            pe_id,
             task_in,
             partial_out,
             merger_size,
@@ -203,7 +211,9 @@ impl Component for BankPe {
 }
 
 /// this struct receive the task from the chip and send the reordered task to the bank pe
+#[derive(Debug)]
 pub struct BankTaskReorder {
+    pub level_id: LevelId,
     pub task_in: ResourceId,
     pub task_out: Vec<ResourceId>,
 
@@ -327,6 +337,7 @@ impl Component for BankTaskReorder {
 
 impl BankTaskReorder {
     pub fn new(
+        level_id: LevelId,
         task_in: ResourceId,
         task_out: Vec<ResourceId>,
         total_reorder_size: usize,
@@ -335,6 +346,7 @@ impl BankTaskReorder {
         comp_id: NamedTimeId,
     ) -> Self {
         Self {
+            level_id,
             task_in,
             task_out,
             total_reorder_size,
@@ -371,7 +383,7 @@ mod test {
         let mut simulator = Simulation::new();
         let two_mat = sim::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
 
-        let task_in = simulator.create_resource(Box::new(Store::new(16)));
+        let task_in = simulator.create_resource(Box::new(Store::new(16)), "test");
 
         let task_sender =
             TaskSender::new(two_mat.a, two_mat.b, task_in, 1, 1, 1, RowMapping::Chunk);
@@ -379,21 +391,37 @@ mod test {
         let task_pe = {
             let mut task_pe = vec![];
             for _i in 0..4 {
-                let task_out = simulator.create_resource(Box::new(Store::new(16)));
+                let task_out = simulator.create_resource(Box::new(Store::new(16)), "test");
                 task_pe.push(task_out);
             }
             task_pe
         };
 
-        let partial_return = simulator.create_resource(Box::new(Store::new(16)));
+        let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
         let comp_id = shared_comp_time.add_component_with_name("123");
-        let bank_task_reorder =
-            BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0), 33., comp_id);
+        let bank_task_reorder = BankTaskReorder::new(
+            LevelId::Dimm,
+            task_in,
+            task_pe.clone(),
+            4,
+            ((0, 0), 0),
+            33.,
+            comp_id,
+        );
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
                 let comp_id = shared_comp_time.add_component_with_name("123");
-                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in, comp_id);
+                let pe_comp = BankPe::new(
+                    LevelId::Bank(Default::default()),
+                    0,
+                    pe_in,
+                    partial_return,
+                    4,
+                    4,
+                    task_in,
+                    comp_id,
+                );
                 pes.push(pe_comp);
             }
             pes
@@ -423,6 +451,7 @@ mod test {
         // create a final receiver for partial sum:
         let final_receiver = FinalReceiver {
             receiver: partial_return,
+            collect_result: false,
         };
         let final_receiver_process = simulator.create_process(final_receiver.run());
         simulator.schedule_event(

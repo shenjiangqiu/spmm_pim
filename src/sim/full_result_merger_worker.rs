@@ -2,11 +2,12 @@
 //! it receives the full partial result from the dispatcher and merger them and send it to merger sender
 
 use super::{
-    component::Component, merger_status::MergerStatusId, FullTaskType, SpmmContex, SpmmStatusEnum,
-    StateWithSharedStatus,
+    component::Component, merger_status::MergerStatusId, FullTaskType, LevelId, SpmmContex,
+    SpmmStatusEnum, StateWithSharedStatus,
 };
-
+#[derive(Debug)]
 pub struct FullResultMergerWorker {
+    pub level_id: LevelId,
     // this is the id of this merger
     pub queue_id_partial_sum_sender: usize,
     pub queue_id_partial_sum_in: usize,

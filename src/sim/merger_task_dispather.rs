@@ -5,7 +5,7 @@ use super::{
     component::Component, merger_status::MergerStatusId, LevelId, SpmmContex, SpmmStatusEnum,
     StateWithSharedStatus,
 };
-
+#[derive(Debug)]
 pub struct MergerWorkerDispatcher {
     pub level_id: LevelId,
     // receive from lower pe

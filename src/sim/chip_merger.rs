@@ -9,9 +9,11 @@ use super::{
     merger_status::MergerStatusId,
     merger_task_sender::*,
     sim_time::{LevelTimeId, NamedTimeId},
-    BankID,
+    BankID, LevelId,
 };
+#[derive(Debug)]
 pub struct ChipMerger {
+    pub level_id: LevelId,
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
 
@@ -25,6 +27,7 @@ pub struct ChipMerger {
 
 impl ChipMerger {
     pub fn new(
+        level_id: LevelId,
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
         merger_status_id: MergerStatusId,
@@ -33,6 +36,7 @@ impl ChipMerger {
         buffer_status_id: BufferStatusId,
     ) -> Self {
         Self {
+            level_id,
             task_in,
             lower_pes,
             merger_status_id,

@@ -7,11 +7,13 @@ use log::debug;
 use crate::csv_nodata::CsVecNodata;
 
 use super::{
-    component::Component, LevelId, PartialResultTaskType, SpmmContex, StateWithSharedStatus,
+    buffer_status::BufferStatusId, component::Component, LevelId, PartialResultTaskType,
+    SpmmContex, StateWithSharedStatus,
 };
 
 /// collect the partial sum from lower pe,
 /// when all lower pe have returned their partial sum, push it to the full_result_merger_dispatcher
+#[derive(Debug)]
 pub struct PartialSumCollector {
     pub level_id: LevelId,
     /// collect ready queue
@@ -21,6 +23,7 @@ pub struct PartialSumCollector {
     /// used to signal to signal collector that one entry is freed
     pub queue_id_pop_signal_out: usize,
     // to record how many partial sum have been collected(hint: the old merger_worker will do this!)
+    pub buffer_status_id: BufferStatusId,
 }
 
 impl Component for PartialSumCollector {
@@ -39,7 +42,7 @@ impl Component for PartialSumCollector {
                 current_time = time;
                 let StateWithSharedStatus {
                     status,
-                    shared_status: _,
+                    shared_status,
                 } = ready_queue_status.into_inner();
                 let (ready_queue_id, is_last) = status.into_push_ready_queue_id().unwrap().1;
                 debug!(
@@ -80,7 +83,12 @@ impl Component for PartialSumCollector {
                             (target_row, finished_result),
                         ),
                     );
-
+                    // fix bug here!
+                    unsafe {
+                        shared_status
+                            .shared_buffer_status
+                            .remove(&self.buffer_status_id, target_row);
+                    }
                     // push to signal collector
                     yield original_status.clone_with_state(
                         super::SpmmStatusEnum::PushBufferPopSignal(self.queue_id_pop_signal_out),

@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use desim::ResourceId;
 use itertools::Itertools;
 use log::debug;
@@ -21,6 +23,17 @@ pub struct TaskSender {
     banks: usize,
     row_mapping: RowMapping,
 }
+
+impl Debug for TaskSender {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TaskSender {{ channels: {}, chips: {}, banks: {}, task_sender: {} }}",
+            self.channels, self.chips, self.banks, self.task_sender
+        )
+    }
+}
+
 impl Component for TaskSender {
     fn run(self) -> Box<super::SpmmGenerator> {
         Box::new(move |context: SpmmContex| {

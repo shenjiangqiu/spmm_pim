@@ -10,6 +10,7 @@ use super::{
     StateWithSharedStatus,
 };
 /// the component that collect the partial sum returned by each worker and ready to send the signle to upper and send the real partial sum to partial sum collector.
+#[derive(Debug)]
 pub struct PartialSumSender {
     pub level_id: LevelId,
     pub queue_id_partial_sum_in: usize,

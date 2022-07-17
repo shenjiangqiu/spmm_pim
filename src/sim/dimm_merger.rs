@@ -6,9 +6,11 @@ use desim::ResourceId;
 
 use super::{
     buffer_status::BufferStatusId, merger_status::MergerStatusId, merger_task_sender::*,
-    sim_time::NamedTimeId, BankID,
+    sim_time::NamedTimeId, BankID, LevelId,
 };
+#[derive(Debug)]
 pub struct DimmMerger {
+    pub level_id: LevelId,
     pub task_in: ResourceId,
     pub lower_pes: Vec<ResourceId>,
 
@@ -21,6 +23,7 @@ pub struct DimmMerger {
 
 impl DimmMerger {
     pub fn new(
+        level_id: LevelId,
         task_in: ResourceId,
         lower_pes: Vec<ResourceId>,
         merger_status_id: MergerStatusId,
@@ -28,6 +31,7 @@ impl DimmMerger {
         buffer_status_id: BufferStatusId,
     ) -> Self {
         Self {
+            level_id,
             task_in,
             lower_pes,
             merger_status_id,
