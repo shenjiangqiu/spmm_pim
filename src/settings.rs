@@ -30,12 +30,16 @@ pub struct MemSettings {
     pub bank_merger_size: usize,
     pub chip_merger_size: usize,
     pub channel_merger_size: usize,
+
+    /// the size of one merger!
     pub dimm_merger_size: usize,
 
     // the merger
     pub bank_merger_count: usize,
     pub chip_merger_count: usize,
     pub channel_merger_count: usize,
+
+    /// the number of mergers
     pub dimm_merger_count: usize,
 
     // the simd width(for bsr)
@@ -52,7 +56,10 @@ pub struct MemSettings {
     pub bank_adder_size: usize,
 
     // the store buffer size
-    pub store_size:usize,
+    pub store_size: usize,
+
+    // buffer lines
+    pub buffer_lines: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

@@ -1,12 +1,14 @@
 pub mod plot;
 pub mod run;
-
 #[cfg(test)]
 mod test {
     use core::slice;
 
+    use enum_as_inner::EnumAsInner;
+    #[derive(EnumAsInner, Debug, Default)]
     enum TestEnum1 {
         A(i32),
+        #[default]
         B,
     }
     enum TestEnum2 {

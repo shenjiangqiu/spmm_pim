@@ -33,7 +33,6 @@ fn _main(args: Args) -> Result<()> {
     log4rs::init_raw_config(config).unwrap_or_else(|err| {
         error!("log4rs init error: {}", err);
     });
-    info!("start sim with {:?}", args);
 
     let start_time = std::time::Instant::now();
     if let Some(generator) = args.generator {
@@ -42,6 +41,7 @@ fn _main(args: Args) -> Result<()> {
         print_completions(generator, &mut cmd);
         return Ok(());
     }
+    info!("start sim with {:?}", args);
 
     debug!("{:?}", args);
     let mut config_files = args.config_file;
@@ -55,8 +55,8 @@ fn _main(args: Args) -> Result<()> {
     let settings = Settings::new(&config_files).wrap_err("fail to create Setting object")?;
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files.clone();
-
-    match args.run_mode {
+    let run_mode = args.run_mode.unwrap_or(RunMode::Sim);
+    match run_mode {
         RunMode::Sim => {
             info!("sim start");
             let graph_name = settings.mtx_files;

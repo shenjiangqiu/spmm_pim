@@ -10,7 +10,7 @@ pub struct Args {
     #[clap(long = "generate", short = 'g', arg_enum)]
     pub generator: Option<Shell>,
     #[clap(long = "run-mode", short = 'r', arg_enum)]
-    pub run_mode: RunMode,
+    pub run_mode: Option<RunMode>,
     /// the path of config file, default is "default.toml"
     #[clap(parse(from_os_str),value_hint=ValueHint::FilePath)]
     pub config_file: Vec<PathBuf>,

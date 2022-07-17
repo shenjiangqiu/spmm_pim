@@ -7,11 +7,12 @@ use desim::ResourceId;
 use log::debug;
 
 use super::{
-    component::Component, sim_time::NamedTimeId, BankID, BankTask, SpmmContex, SpmmStatusEnum,
+    component::Component, sim_time::NamedTimeId, BankID, BankTask, LevelId, SpmmContex,
+    SpmmStatusEnum,
 };
 use crate::{
     pim::merge_rows_into_one,
-    sim::{BankTaskEnum, SpmmStatus},
+    sim::{BankTaskEnum, StateWithSharedStatus},
 };
 //849191287
 
@@ -83,7 +84,10 @@ impl FullBankMergerStatus {
 }
 
 /// BankPe is a component that can receive tasks from chip and perform merge
+#[derive(Debug)]
 pub struct BankPe {
+    pub level_id: LevelId,
+    pub pe_id: usize,
     // settings
     pub merger_size: usize,
     pub adder_size: usize,
@@ -99,6 +103,8 @@ pub struct BankPe {
 
 impl BankPe {
     pub fn new(
+        level_id: LevelId,
+        pe_id: usize,
         task_in: ResourceId,
         partial_out: ResourceId,
         merger_size: usize,
@@ -107,6 +113,8 @@ impl BankPe {
         named_idle_time_id: NamedTimeId,
     ) -> Self {
         Self {
+            level_id,
+            pe_id,
             task_in,
             partial_out,
             merger_size,
@@ -121,14 +129,14 @@ impl Component for BankPe {
     fn run(self) -> Box<super::SpmmGenerator> {
         Box::new(move |context: SpmmContex| {
             // first get the task
-            let (_time, status) = context.into_inner();
+            let (_time, original_status) = context.into_inner();
             let mut current_task = 0;
             let mut tasks = vec![];
             // this is used for record the current time before each yield
             let mut current_time = 0.;
             loop {
                 let context: SpmmContex =
-                    yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
+                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (time, pop_status) = context.into_inner();
                 debug!("BANK_PE: time: {},received taske: {:?}", time, pop_status);
                 let gap = time - current_time;
@@ -136,21 +144,23 @@ impl Component for BankPe {
 
                 // send read request to row buffer.
 
-                let SpmmStatus {
-                    shared_merger_status: _,
-                    shared_bankpe_status: _,
-                    shared_sim_time: _,
-                    shared_level_time: _,
-                    shared_comp_time,
-                    state,
-                    enable_log: _,
-                } = pop_status;
-                let (_resouce_id, bank_task) = state.into_push_bank_task().unwrap();
+                let StateWithSharedStatus {
+                    status,
+                    shared_status,
+                } = pop_status.into_inner();
+
+                let (_resouce_id, bank_task) = status.into_push_bank_task().unwrap();
                 unsafe {
-                    shared_comp_time.add_idle_time(self.named_idle_time_id, "get_task", gap);
+                    shared_status.shared_named_time.add_idle_time(
+                        self.named_idle_time_id,
+                        "get_task",
+                        gap,
+                    );
                 }
                 match bank_task {
                     BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
+                        debug!("BANK_PE: receive task: to: row: {},{:?}", to, row);
+
                         tasks.push(row);
                         current_task = to;
                     }
@@ -163,12 +173,18 @@ impl Component for BankPe {
                                 merge_rows_into_one(tasks.clone(), self.merger_size);
                             // todo: refine the add cycle according to the adder size
                             let wait_time = cmp::max(add_cycle, merge_cycle) as f64;
-                            status.shared_sim_time.add_bank_merge(wait_time);
-                            let context =
-                                yield status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
+                            shared_status.shared_sim_time.add_bank_merge(wait_time);
+                            let context = yield original_status
+                                .clone_with_state(SpmmStatusEnum::Wait(wait_time));
                             let (_time, status) = context.into_inner();
                             current_time = _time;
                             // this could be idle due to upper pressure
+                            debug!(
+                                "BANK_PE: wait time: {:?} and push to sender: {:?}, the task:{:?}",
+                                wait_time,
+                                self.partial_out,
+                                (current_task, self.task_sender_input_id, &data)
+                            );
                             let context =
                                 yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                                     self.partial_out,
@@ -178,7 +194,7 @@ impl Component for BankPe {
                             let return_gap = _time - current_time;
                             current_time = _time;
                             unsafe {
-                                shared_comp_time.add_idle_time(
+                                shared_status.shared_named_time.add_idle_time(
                                     self.named_idle_time_id,
                                     "return_to_chip",
                                     return_gap,
@@ -195,7 +211,9 @@ impl Component for BankPe {
 }
 
 /// this struct receive the task from the chip and send the reordered task to the bank pe
+#[derive(Debug)]
 pub struct BankTaskReorder {
+    pub level_id: LevelId,
     pub task_in: ResourceId,
     pub task_out: Vec<ResourceId>,
 
@@ -209,18 +227,19 @@ pub struct BankTaskReorder {
 
 // TODO
 impl Component for BankTaskReorder {
+    #[allow(unused_assignments)]
     fn run(self) -> Box<super::SpmmGenerator> {
         let num_pes = self.task_out.len();
         Box::new(move |context: SpmmContex| {
             // todo delete this
             let mut current_target_pe = 0;
             let mut current_row = 0;
-            let (_time, status) = context.into_inner();
+            let (_time, original_status) = context.into_inner();
             let mut current_time = 0.;
             loop {
                 // first get the context
                 let context: SpmmContex =
-                    yield status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
+                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
                 let (time, pop_status) = context.into_inner();
                 let gap = time - current_time;
                 // TODO: add the idle time to the comp_time
@@ -229,21 +248,20 @@ impl Component for BankTaskReorder {
                     "TASK_REORDER: time: {},received taske: {:?}",
                     time, pop_status
                 );
-                let SpmmStatus {
-                    state,
-                    enable_log: _,
-                    shared_merger_status: _,
-                    shared_bankpe_status: _,
-                    shared_sim_time: _,
-                    shared_level_time: _,
-                    shared_comp_time,
-                } = pop_status;
+                let StateWithSharedStatus {
+                    status,
+                    shared_status,
+                } = pop_status.into_inner();
                 unsafe {
                     // safety: the comp_id is set by add_comp, that should be valid!
-                    shared_comp_time.add_idle_time(self.comp_id, "get_task_from_chip", gap);
+                    shared_status.shared_named_time.add_idle_time(
+                        self.comp_id,
+                        "get_task_from_chip",
+                        gap,
+                    );
                 }
 
-                let (_resouce_id, task) = state.into_push_bank_task().unwrap();
+                let (_resouce_id, task) = status.into_push_bank_task().unwrap();
 
                 match task {
                     BankTaskEnum::PushBankTask(BankTask {
@@ -266,45 +284,47 @@ impl Component for BankTaskReorder {
                             for _i in inner_row_id_start..inner_row_id_end {
                                 // TODO , read the setting
                                 total_waiting += 16.;
-                                let context =
-                                    yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let context = yield original_status
+                                    .clone_with_state(SpmmStatusEnum::Wait(16.));
                                 let (_time, _status) = context.into_inner();
                                 current_time = _time;
                             }
                         } else {
                             for _i in inner_row_id_start..=inner_row_id_end {
                                 total_waiting += 16.;
-                                let context =
-                                    yield status.clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let context = yield original_status
+                                    .clone_with_state(SpmmStatusEnum::Wait(16.));
                                 let (_time, _status) = context.into_inner();
                                 current_time = _time;
                             }
                         }
 
-                        status.shared_sim_time.add_bank_read(total_waiting);
+                        shared_status.shared_sim_time.add_bank_read(total_waiting);
                         current_row = inner_row_id_end;
 
-                        let context = yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                            self.task_out[current_target_pe],
-                            BankTaskEnum::PushBankTask(BankTask {
-                                from,
-                                to,
-                                row,
-                                bank_id,
-                                row_shift,
-                                row_size,
-                            }),
-                        ));
+                        let context =
+                            yield original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                self.task_out[current_target_pe],
+                                BankTaskEnum::PushBankTask(BankTask {
+                                    from,
+                                    to,
+                                    row,
+                                    bank_id,
+                                    row_shift,
+                                    row_size,
+                                }),
+                            ));
                         let (_time, _status) = context.into_inner();
                         current_time = _time;
                     }
                     BankTaskEnum::EndThisTask => {
                         // end this task
                         // push this to current_taget_pe and switch to the next
-                        let context = yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                            self.task_out[current_target_pe],
-                            BankTaskEnum::EndThisTask,
-                        ));
+                        let context =
+                            yield original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                self.task_out[current_target_pe],
+                                BankTaskEnum::EndThisTask,
+                            ));
                         let (_time, _status) = context.into_inner();
                         current_time = _time;
                         current_target_pe = (current_target_pe + 1) % num_pes;
@@ -317,6 +337,7 @@ impl Component for BankTaskReorder {
 
 impl BankTaskReorder {
     pub fn new(
+        level_id: LevelId,
         task_in: ResourceId,
         task_out: Vec<ResourceId>,
         total_reorder_size: usize,
@@ -325,6 +346,7 @@ impl BankTaskReorder {
         comp_id: NamedTimeId,
     ) -> Self {
         Self {
+            level_id,
             task_in,
             task_out,
             total_reorder_size,
@@ -336,17 +358,14 @@ impl BankTaskReorder {
 }
 #[cfg(test)]
 mod test {
-    use std::{cell::RefCell, collections::BTreeMap, path::Path, rc::Rc};
+    use std::{path::Path, rc::Rc};
 
     use desim::{resources::Store, EndCondition, Simulation};
 
     use crate::{
         settings::RowMapping,
         sim::{
-            final_receiver::FinalReceiver,
-            merger_task_sender::FullMergerStatus,
-            sim_time::{ComponentTime, LevelTime, SharedNamedTime, SharedSimTime},
-            task_sender::TaskSender,
+            final_receiver::FinalReceiver, sim_time::SharedNamedTime, task_sender::TaskSender,
             SpmmStatus,
         },
     };
@@ -358,21 +377,13 @@ mod test {
         let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
-        let shared_level_time: Rc<LevelTime> = Rc::new(Default::default());
         let shared_comp_time: Rc<SharedNamedTime> = Rc::new(Default::default());
-        let status = SpmmStatus::new(
-            SpmmStatusEnum::Continue,
-            Rc::new(RefCell::new(FullMergerStatus::new())),
-            Rc::new(RefCell::new(BTreeMap::new())),
-            Rc::new(SharedSimTime::new()),
-            shared_level_time,
-            shared_comp_time.clone(),
-        );
+        let status = SpmmStatus::new(SpmmStatusEnum::Continue, Default::default());
         debug!("start test");
         let mut simulator = Simulation::new();
         let two_mat = sim::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
 
-        let task_in = simulator.create_resource(Box::new(Store::new(16)));
+        let task_in = simulator.create_resource(Box::new(Store::new(16)), "test");
 
         let task_sender =
             TaskSender::new(two_mat.a, two_mat.b, task_in, 1, 1, 1, RowMapping::Chunk);
@@ -380,22 +391,37 @@ mod test {
         let task_pe = {
             let mut task_pe = vec![];
             for _i in 0..4 {
-                let task_out = simulator.create_resource(Box::new(Store::new(16)));
+                let task_out = simulator.create_resource(Box::new(Store::new(16)), "test");
                 task_pe.push(task_out);
             }
             task_pe
         };
 
-        let partial_return = simulator.create_resource(Box::new(Store::new(16)));
+        let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
         let comp_id = shared_comp_time.add_component_with_name("123");
-        let bank_task_reorder =
-            BankTaskReorder::new(task_in, task_pe.clone(), 4, ((0, 0), 0), 33., comp_id);
+        let bank_task_reorder = BankTaskReorder::new(
+            LevelId::Dimm,
+            task_in,
+            task_pe.clone(),
+            4,
+            ((0, 0), 0),
+            33.,
+            comp_id,
+        );
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
                 let comp_id = shared_comp_time.add_component_with_name("123");
-                let retrun_idle_id = shared_comp_time.add_component_with_name("123");
-                let pe_comp = BankPe::new(pe_in, partial_return, 4, 4, task_in, comp_id);
+                let pe_comp = BankPe::new(
+                    LevelId::Bank(Default::default()),
+                    0,
+                    pe_in,
+                    partial_return,
+                    4,
+                    4,
+                    task_in,
+                    comp_id,
+                );
                 pes.push(pe_comp);
             }
             pes
@@ -425,6 +451,7 @@ mod test {
         // create a final receiver for partial sum:
         let final_receiver = FinalReceiver {
             receiver: partial_return,
+            collect_result: false,
         };
         let final_receiver_process = simulator.create_process(final_receiver.run());
         simulator.schedule_event(

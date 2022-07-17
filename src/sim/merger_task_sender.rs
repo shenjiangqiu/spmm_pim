@@ -4,9 +4,11 @@ use desim::{ResourceId, SimContext};
 use itertools::Itertools;
 use log::debug;
 
+use crate::sim::StateWithSharedStatus;
+
 use super::{
-    component::Component, sim_time::NamedTimeId, BankID, BankTask, BankTaskEnum, SpmmContex,
-    SpmmStatus, SpmmStatusEnum,
+    buffer_status::BufferStatusId, component::Component, merger_status::MergerStatusId,
+    sim_time::NamedTimeId, BankID, BankTask, BankTaskEnum, SpmmContex, SpmmStatus, SpmmStatusEnum,
 };
 
 pub trait MergerTaskSender {
@@ -16,9 +18,10 @@ pub trait MergerTaskSender {
     fn get_lower_pes(&self) -> &[ResourceId];
     fn get_task_in(&self) -> ResourceId;
     fn get_merger_resouce_id(&self) -> ResourceId;
-    fn get_merger_status_id(&self) -> usize;
+    fn get_merger_status_id(&self) -> &MergerStatusId;
 
     fn get_time_id(&self) -> &NamedTimeId;
+    fn get_buffer_id(&self) -> &BufferStatusId;
 }
 #[derive(Debug, Clone, Default)]
 pub struct MergerWorkerStatus {
@@ -131,26 +134,32 @@ impl<T> Component for T
 where
     T: MergerTaskSender + 'static,
 {
+    /// the merger task sender
     fn run(self) -> Box<super::SpmmGenerator> {
         Box::new(move |context: SpmmContex| {
-            let (_time, status) = context.into_inner();
-            let mut first_task = true;
+            let (_time, original_status) = context.into_inner();
             let mut current_time = 0.;
             // first get the task
             loop {
                 // step 1: get the finished
                 let context: SimContext<SpmmStatus> =
-                    yield status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in()));
+                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in()));
                 debug!("MERGER_TSK_SD:id:{},{:?}", self.get_task_in(), context);
                 let (_time, task) = context.into_inner();
                 let gap = _time - current_time;
                 current_time = _time;
-                let (_, task, merger_status, _, _, named_time) = task.into_inner();
+                let StateWithSharedStatus {
+                    status,
+                    shared_status,
+                } = task.into_inner();
                 unsafe {
-                    named_time.add_idle_time(*self.get_time_id(), "get_task", gap);
+                    shared_status.shared_named_time.add_idle_time(
+                        *self.get_time_id(),
+                        "get_task",
+                        gap,
+                    );
                 }
-                let task = task.into_push_bank_task().unwrap().1;
-                let status_id = self.get_merger_status_id();
+                let task = status.into_push_bank_task().unwrap().1;
 
                 match task {
                     super::BankTaskEnum::PushBankTask(BankTask {
@@ -161,69 +170,62 @@ where
                         row_shift,
                         row_size,
                     }) => {
-                        // push to target pe and set the status
-
-                        // first set the status:
-                        if first_task {
-                            let context = yield status.clone_with_state(SpmmStatusEnum::Acquire(
-                                self.get_merger_resouce_id(),
-                            ));
-                            let (_time, _status) = context.into_inner();
-                            let gap = _time - current_time;
-                            current_time = _time;
-                            unsafe {
-                                named_time.add_idle_time(
-                                    *self.get_time_id(),
-                                    "acquire_merger_resource",
-                                    gap,
-                                );
-                            }
-                            first_task = false;
-                        }
                         // then push to target pe
                         let lower_pe_id = self.get_lower_id(&bank_id);
 
-                        merger_status.borrow_mut().id_to_mergerstatus[status_id]
-                            .push(to, lower_pe_id);
-                        let context = yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                            lower_pe_id,
-                            BankTaskEnum::PushBankTask(BankTask {
-                                from,
+                        // record that the task is on going to lower_pe_id, record it!
+                        unsafe {
+                            shared_status.shared_buffer_status.add_waiting(
+                                self.get_buffer_id(),
                                 to,
-                                row,
-                                bank_id,
-                                row_shift,
-                                row_size,
-                            }),
-                        ));
+                                lower_pe_id,
+                            );
+                        }
+
+                        let context =
+                            yield original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                lower_pe_id,
+                                BankTaskEnum::PushBankTask(BankTask {
+                                    from,
+                                    to,
+                                    row,
+                                    bank_id,
+                                    row_shift,
+                                    row_size,
+                                }),
+                            ));
                         let (_time, _status) = context.into_inner();
                         let gap = _time - current_time;
                         current_time = _time;
 
                         unsafe {
-                            named_time.add_idle_time(*self.get_time_id(), "push_bank_task", gap);
+                            shared_status.shared_named_time.add_idle_time(
+                                *self.get_time_id(),
+                                "push_bank_task",
+                                gap,
+                            );
                         }
                     }
                     super::BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
                         for lower_pe_id in self.get_lower_pes().iter().cloned().collect_vec() {
-                            let context =
-                                yield status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                            let context = yield original_status.clone_with_state(
+                                SpmmStatusEnum::PushBankTask(
                                     lower_pe_id,
                                     super::BankTaskEnum::EndThisTask,
-                                ));
+                                ),
+                            );
                             let (_time, _status) = context.into_inner();
                             let gap = _time - current_time;
                             current_time = _time;
                             unsafe {
-                                named_time.add_idle_time(
+                                shared_status.shared_named_time.add_idle_time(
                                     *self.get_time_id(),
                                     "push_end_bank_task",
                                     gap,
                                 );
                             }
                         }
-                        first_task = true;
                     }
                 }
             }

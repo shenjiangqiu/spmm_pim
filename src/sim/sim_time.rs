@@ -9,6 +9,8 @@
 
 use std::{cell::UnsafeCell, collections::BTreeMap};
 
+use log::info;
+
 /// the time statistics of all components
 ///
 /// in this struct, a vec of `NamedTime` is stored. each `NamedTime` is a component's time statistics.
@@ -69,10 +71,11 @@ impl SharedNamedTime {
     }
 
     pub fn show_data(&self, sim_time: f64) {
+        info!("total_time: {}", sim_time);
         unsafe {
             let data = &*self.data.get();
             for (name, time) in data.iter() {
-                println!("{}", name);
+                info!("{}", name);
                 time.show_data(sim_time);
             }
         }
@@ -95,9 +98,9 @@ impl NamedTime {
     }
 
     fn show_data(&self, sim_time: f64) {
-        let total_time: f64 = self.data.iter().map(|(n, t)| t).sum();
+        let total_time: f64 = self.data.iter().map(|(_n, t)| t).sum();
         for (name, time) in self.data.iter() {
-            println!(
+            info!(
                 "{}: {}: {:.1}% :{:.1}%",
                 name,
                 time,
