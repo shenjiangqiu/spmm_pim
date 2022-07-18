@@ -35,7 +35,6 @@ use self::{
     buffer_status::SharedBufferStatus,
     channel_merger::ChannelMerger,
     chip_merger::ChipMerger,
-    component::Component,
     dimm_merger::DimmMerger,
     final_receiver::FinalReceiver,
     full_result_merger_worker::FullResultMergerWorker,
@@ -841,7 +840,7 @@ mod test {
     #[test]
     fn sim_test() {
         // ---- first create neccessary status structures
-        let config_str = include_str!("../../log_config_debug.yml");
+        let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
 

@@ -366,7 +366,7 @@ mod test {
         settings::RowMapping,
         sim::{
             final_receiver::FinalReceiver, sim_time::SharedNamedTime, task_sender::TaskSender,
-            SpmmStatus,
+            SharedStatus, SpmmStatus,
         },
     };
 
@@ -377,8 +377,14 @@ mod test {
         let config_str = include_str!("../../log_config.yml");
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
-        let shared_comp_time: Rc<SharedNamedTime> = Rc::new(Default::default());
-        let status = SpmmStatus::new(SpmmStatusEnum::Continue, Default::default());
+        let shared_named_time: Rc<SharedNamedTime> = Rc::new(Default::default());
+        let status = SpmmStatus::new(
+            SpmmStatusEnum::Continue,
+            SharedStatus {
+                shared_named_time: shared_named_time.clone(),
+                ..Default::default()
+            },
+        );
         debug!("start test");
         let mut simulator = Simulation::new();
         let two_mat = sim::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
@@ -398,7 +404,7 @@ mod test {
         };
 
         let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
-        let comp_id = shared_comp_time.add_component_with_name("123");
+        let comp_id = shared_named_time.add_component_with_name("123");
         let bank_task_reorder = BankTaskReorder::new(
             LevelId::Dimm,
             task_in,
@@ -411,7 +417,7 @@ mod test {
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let comp_id = shared_comp_time.add_component_with_name("123");
+                let comp_id = shared_named_time.add_component_with_name("123");
                 let pe_comp = BankPe::new(
                     LevelId::Bank(Default::default()),
                     0,

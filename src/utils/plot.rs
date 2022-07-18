@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bar(){
+    fn test_bar() {
         // let 🍡="🦀";
         // let 🦀="🍡";
     }
