@@ -96,7 +96,8 @@ pub type PartialResultTaskType = (usize, ResourceId, CsVecNodata<usize>);
 // target row, and all partial result
 pub type FullTaskType = (usize, Vec<CsVecNodata<usize>>);
 pub type BankReadRowTaskType = usize;
-
+// target queue_id,target_row,is_finished
+pub type ReadyQueueIdType = (usize, usize, bool);
 #[derive(Default, Debug, Clone, EnumAsInner)]
 pub enum SpmmStatusEnum {
     #[default]
@@ -107,7 +108,7 @@ pub enum SpmmStatusEnum {
     PushReadBankTask(ResourceId, BankReadRowTaskType),
     PushSignal(ResourceId, PartialSignal),
     /// (queue_id, is_last)
-    PushReadyQueueId(ResourceId, (usize, bool)),
+    PushReadyQueueId(ResourceId, ReadyQueueIdType),
     PushFullPartialTask(ResourceId, FullTaskType),
     PushBufferPopSignal(ResourceId),
     Pop(ResourceId),
@@ -467,7 +468,7 @@ fn build_channel(
             let channel_signal_sender = PartialSumSender {
                 queue_id_partial_sum_in: merger_to_sender_queue,
                 queue_id_partial_sum_out: sim
-                    .create_resource(Box::new(Store::new(1)), "signal_data_sender_channel"),
+                    .create_resource(Box::new(Store::new(0)), "signal_data_sender_channel"),
                 queue_id_signal_out: dimm_signal_in,
                 level_id: LevelId::Channel(channel_id),
             };
@@ -585,7 +586,7 @@ fn build_chip(
             let chip_signal_sender = PartialSumSender {
                 queue_id_partial_sum_in: merger_to_sender_queue,
                 queue_id_partial_sum_out: sim
-                    .create_resource(Box::new(Store::new(1)), "signal_data_sender_chip"),
+                    .create_resource(Box::new(Store::new(0)), "signal_data_sender_chip"),
                 queue_id_signal_out: channel_signal_in,
                 level_id: LevelId::Chip(chip_id),
             };
@@ -679,7 +680,7 @@ fn build_bank(
             let bank_signal_sender = PartialSumSender {
                 queue_id_partial_sum_in: merger_to_sender,
                 queue_id_partial_sum_out: sim
-                    .create_resource(Box::new(Store::new(1)), "signal_data_sender_bank"),
+                    .create_resource(Box::new(Store::new(0)), "signal_data_sender_bank"),
                 queue_id_signal_out: chip_signal_in,
                 level_id: LevelId::Bank(bank_id),
             };
@@ -746,10 +747,7 @@ impl Simulator {
 
         let final_receiver_resouce =
             sim.create_resource(Box::new(Store::new(store_size)), "final_receiver");
-        let final_rev = FinalReceiver {
-            receiver: final_receiver_resouce,
-            collect_result: true,
-        };
+        let final_rev = FinalReceiver::new(final_receiver_resouce, true, &input_matrix);
 
         p_collector.create_process_and_schedule(&mut sim, final_rev, &status);
         // this store connect the task sender and the Dimm
@@ -779,12 +777,15 @@ impl Simulator {
             bank_level_id,
             &mut p_collector,
         )?;
-        p_collector.show_data();
+        // p_collector.show_data();
 
         let sim = sim.run(EndCondition::NoEvents);
-        info!("{}", sim.print_resources());
+        // validate the result
+
+        // info!("{}", sim.print_resources());
         let time = sim.time();
         status.shared_status.shared_named_time.show_data(time);
+
         Ok(())
     }
 }

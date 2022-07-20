@@ -44,7 +44,8 @@ impl Component for PartialSumCollector {
                     status,
                     shared_status,
                 } = ready_queue_status.into_inner();
-                let (ready_queue_id, is_last) = status.into_push_ready_queue_id().unwrap().1;
+                let (ready_queue_id, target_row, is_last) =
+                    status.into_push_ready_queue_id().unwrap().1;
                 debug!(
                     "PartialSumCollector-{:?}: receive ready queue id:{:?}",
                     self.level_id, ready_queue_id
@@ -60,8 +61,9 @@ impl Component for PartialSumCollector {
                     shared_status: _,
                 } = partial_sum_status.into_inner();
 
-                let (target_row, _source_pe_id, result): PartialResultTaskType =
+                let (target_row2, _source_pe_id, result): PartialResultTaskType =
                     status.into_push_partial_task().unwrap().1;
+                assert_eq!(target_row, target_row2,"the signal queue target id is not equal to the data id the queue_id is:{ready_queue_id}, check is the queue is poped by other first??");
                 debug!(
                     "PartialSumCollector-{:?}: receive partial sum:{:?}",
                     self.level_id, result
@@ -73,8 +75,8 @@ impl Component for PartialSumCollector {
                 if is_last {
                     let finished_result = current_partial_sum.remove(&target_row).unwrap();
                     debug!(
-                        "PartialSumCollector-{:?}: push full partial sum:{:?}",
-                        self.level_id, finished_result
+                        "PartialSumCollector-{:?}:self_queue_id_in:{}, push full partial sum:{:?} of target row:{target_row}",
+                        self.level_id,self.queue_id_ready_in, finished_result
                     );
                     // push to partial sum dispatcher
                     yield original_status.clone_with_state(

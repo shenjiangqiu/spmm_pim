@@ -53,7 +53,7 @@ where
             );
             debug!("bank_id: {:?}", bank_id);
             // TODO: this is a bug, the row id should not get by row_celect, this real row size of bank is not the row size of the matrixs
-            // 
+            //
             let row_id_in_bank = pim::get_row_id_in_bank(row_select, mem_settings, num_rows);
             debug!("row_id_in_bank: {:?}", row_id_in_bank);
 
@@ -164,5 +164,22 @@ where
         assert_eq!(result.1.len(), 1);
 
         (result.0.pop().unwrap(), result.1.pop().unwrap())
+    }
+}
+
+#[cfg(test)]
+mod towmatrix_test {
+    use sprs::CsMat;
+
+    use super::TwoMatrix;
+
+    #[test]
+    fn matrix_mul() -> eyre::Result<()> {
+        let csr: CsMat<i32> = sprs::io::read_matrix_market("mtx/test.mtx")?.to_csr();
+        let trans_pose = csr.transpose_view().to_csr();
+        let two_matrix = TwoMatrix::new(csr, trans_pose);
+        let c = &two_matrix.a * &two_matrix.b;
+        println!("{c:?}");
+        Ok(())
     }
 }

@@ -56,19 +56,19 @@ impl Component for PartialSumSignalCollector {
                                 )
                             };
                             debug!(
-                                "PartialSumSignalCollector-{:?}: receive PushSignal:{:?}",
-                                self.level_id, signal
+                                "PartialSumSignalCollector-{:?}:,target_id:{},finished:{}, receive PushSignal:{:?}",
+                                self.level_id,signal.target_id,finished, signal
+                            );
+                            debug!(
+                                "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?},queue_id:{}",
+                                self.level_id,
+                                (signal.self_queue_id,signal.target_id, finished),self.queue_id_ready_out
                             );
                             yield original_status.clone_with_state(
                                 SpmmStatusEnum::PushReadyQueueId(
                                     self.queue_id_ready_out,
-                                    (signal.self_queue_id, finished),
+                                    (signal.self_queue_id, signal.target_id, finished),
                                 ),
-                            );
-                            debug!(
-                                "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?}",
-                                self.level_id,
-                                (signal.self_queue_id, finished)
                             );
                         } else {
                             // cannot receive now, store it and resume it later
@@ -103,7 +103,7 @@ impl Component for PartialSumSignalCollector {
                                 yield original_status.clone_with_state(
                                     SpmmStatusEnum::PushReadyQueueId(
                                         self.queue_id_ready_out,
-                                        (signal.self_queue_id, finished),
+                                        (signal.self_queue_id, signal.target_id, finished),
                                     ),
                                 );
                                 debug!(

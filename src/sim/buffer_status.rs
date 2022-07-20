@@ -7,6 +7,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use log::debug;
 
 /// the buffer status help to decide whether to receive a new line,
 /// # Policy:
@@ -15,6 +16,8 @@ use itertools::Itertools;
 /// - else, drop it
 #[derive(Debug)]
 pub struct BufferStatus {
+    /// self id
+    id: usize,
     /// how many rows can be buffered in total
     total_rows: usize,
     /// currently occupied rows(store the target row id)
@@ -31,11 +34,12 @@ pub struct BufferStatus {
 impl BufferStatus {
     /// create a new buffer status
     /// - `total_size` the max lines can be buffered in total, should be larger than 2!
-    pub fn new(total_size: usize) -> Self {
+    pub fn new(total_size: usize, id: usize) -> Self {
         if total_size < 2 {
             panic!("total_size should be greater than 2");
         }
         Self {
+            id,
             total_rows: total_size,
             occupied_rows: BTreeSet::new(),
             waiting_sequence: VecDeque::new(),
@@ -83,7 +87,8 @@ impl BufferStatus {
         // todo: first modify current occupied rows, then modify the track status. if all sub pe have returned, then remove the waiting sequence and trace.
 
         // step 1, add the new row to the occupied rows
-
+        let id = self.id;
+        debug!("BUFFER_STATUS:{id} receive row {new_row},subid: {sub_id}");
         assert!(self.can_receive(new_row));
         self.occupied_rows.insert(new_row);
         assert!(self.occupied_rows.len() <= self.total_rows);
@@ -94,6 +99,7 @@ impl BufferStatus {
         let removed = entry.remove(&sub_id);
         assert!(removed);
         if entry.is_empty() {
+            debug!("BUFFER_STATUS:{id} all sub id received {new_row} {sub_id}");
             // all sub pe have returned, remove the waiting sequence
             self.waiting_sub_ids.remove(&new_row);
 
@@ -108,6 +114,8 @@ impl BufferStatus {
 
     /// when the pe is ready to make a row to merger pe, remove it from the buffer!
     pub fn remove(&mut self, row: usize) {
+        let id = self.id;
+        debug!("BUFFER_STATUS:id:{id} remove row: {row}");
         let moved = self.occupied_rows.remove(&row);
         assert!(moved);
     }
@@ -154,7 +162,7 @@ impl SharedBufferStatus {
     pub fn add_component(&self, buffer_rows: usize) -> BufferStatusId {
         let inner = unsafe { &mut *self.inner.get() };
         let id = inner.len();
-        inner.push(BufferStatus::new(buffer_rows));
+        inner.push(BufferStatus::new(buffer_rows, id));
         BufferStatusId { id }
     }
     /// # Safety:

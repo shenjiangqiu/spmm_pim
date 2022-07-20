@@ -390,6 +390,16 @@ mod test {
         let two_mat = sim::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
 
         let task_in = simulator.create_resource(Box::new(Store::new(16)), "test");
+        // create a final receiver for partial sum:
+        let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
+
+        let final_receiver = FinalReceiver::new(partial_return, false, &two_mat);
+        let final_receiver_process = simulator.create_process(final_receiver.run());
+        simulator.schedule_event(
+            0.0,
+            final_receiver_process,
+            status.clone_with_state(SpmmStatusEnum::Continue),
+        );
 
         let task_sender =
             TaskSender::new(two_mat.a, two_mat.b, task_in, 1, 1, 1, RowMapping::Chunk);
@@ -403,7 +413,6 @@ mod test {
             task_pe
         };
 
-        let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
         let comp_id = shared_named_time.add_component_with_name("123");
         let bank_task_reorder = BankTaskReorder::new(
             LevelId::Dimm,
@@ -453,18 +462,6 @@ mod test {
                 status.clone_with_state(SpmmStatusEnum::Continue),
             );
         }
-
-        // create a final receiver for partial sum:
-        let final_receiver = FinalReceiver {
-            receiver: partial_return,
-            collect_result: false,
-        };
-        let final_receiver_process = simulator.create_process(final_receiver.run());
-        simulator.schedule_event(
-            0.0,
-            final_receiver_process,
-            status.clone_with_state(SpmmStatusEnum::Continue),
-        );
 
         simulator.run(EndCondition::NoEvents);
     }

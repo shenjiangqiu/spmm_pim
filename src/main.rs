@@ -28,6 +28,7 @@ fn main() -> Result<()> {
 }
 
 fn _main(args: Args) -> Result<()> {
+    // let config_str = include_str!("../log_config_debug.yml");
     let config_str = include_str!("../log_config.yml");
     let config = serde_yaml::from_str(config_str).unwrap();
     log4rs::init_raw_config(config).unwrap_or_else(|err| {
