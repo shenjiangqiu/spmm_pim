@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
-use desim::ResourceId;
+use genawaiter::{rc::gen, yield_};
 use log::debug;
-use sprs::CsMat;
+use qsim::ResourceId;
 
 use crate::{
     csv_nodata::CsVecNodata,
@@ -10,7 +8,7 @@ use crate::{
     two_matrix::TwoMatrix,
 };
 
-use super::{component::Component, SpmmContex, SpmmStatusEnum};
+use super::{component::Component, SpmmContex, SpmmStatus, SpmmStatusEnum};
 #[derive(Debug)]
 pub struct FinalReceiver {
     pub receiver: ResourceId,
@@ -22,7 +20,7 @@ impl FinalReceiver {
     pub fn new(
         receiver: ResourceId,
         collect_result: bool,
-        tow_matrix: &TwoMatrix<i32, i32>,
+        _tow_matrix: &TwoMatrix<i32, i32>,
     ) -> Self {
         // there is a bug here, maybe resolve later!
         // let a = &tow_matrix.a;
@@ -41,13 +39,12 @@ impl FinalReceiver {
 }
 
 impl Component for FinalReceiver {
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
-            let (_time, original_status) = context.into_inner();
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        Box::new(gen!({
             let mut all_rows_collected = vec![];
             loop {
                 let ret: SpmmContex =
-                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.receiver));
+                    yield_!(original_status.clone_with_state(SpmmStatusEnum::Pop(self.receiver)));
                 debug!("FINIAL_RECIEVER: received final result: {:?}", ret);
                 let (_time, pop_status) = ret.into_inner();
                 let StateWithSharedStatus {
@@ -67,6 +64,6 @@ impl Component for FinalReceiver {
                     );
                 }
             }
-        })
+        }))
     }
 }

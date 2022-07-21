@@ -1,5 +1,3 @@
-#![feature(generators, generator_trait)]
-
 pub mod args;
 pub mod bsr;
 pub mod bsr_row_builder;

@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 
-use desim::ResourceId;
+use crate::{csv_nodata::CsVecNodata, settings::RowMapping};
+use genawaiter::{rc::gen, yield_};
 use itertools::Itertools;
 use log::debug;
+use qsim::ResourceId;
 use sprs::CsMat;
-
-use crate::{csv_nodata::CsVecNodata, settings::RowMapping};
 
 use super::{
     component::Component, id_translation::get_bank_id_from_row_id, BankTask, BankTaskEnum,
-    SpmmContex,
+    SpmmStatus,
 };
 
 pub struct TaskSender {
@@ -35,9 +35,8 @@ impl Debug for TaskSender {
 }
 
 impl Component for TaskSender {
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
-            let (_time, status) = context.into_inner();
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        Box::new(gen!({
             let all_send_task = self
                 .matrix_a
                 .outer_iterator()
@@ -66,25 +65,29 @@ impl Component for TaskSender {
                         .into();
                     debug!("SENDER: {}:{}:{:?}", target_idx, source_idx, row);
                     let row_start = self.matrix_b.indptr().outer_inds_sz(source_idx);
-                    yield status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
-                        self.task_sender,
-                        BankTaskEnum::PushBankTask(BankTask {
-                            from: source_idx,
-                            to: target_idx,
-                            row,
-                            bank_id,
-                            row_shift: row_start.start,
-                            row_size: row_start.end - row_start.start,
-                        }),
-                    ));
+                    yield_!(
+                        original_status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
+                            self.task_sender,
+                            BankTaskEnum::PushBankTask(BankTask {
+                                from: source_idx,
+                                to: target_idx,
+                                row,
+                                bank_id,
+                                row_shift: row_start.start,
+                                row_size: row_start.end - row_start.start,
+                            }),
+                        ))
+                    );
                 }
                 // then send a end signal
-                yield status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
-                    self.task_sender,
-                    BankTaskEnum::EndThisTask,
-                ));
+                yield_!(
+                    original_status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
+                        self.task_sender,
+                        BankTaskEnum::EndThisTask,
+                    ))
+                );
             }
-        })
+        }))
     }
 }
 

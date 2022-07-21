@@ -1,7 +1,7 @@
-use desim::ResourceId;
+use qsim::ResourceId;
 
-use super::{component::Component, SpmmContex, SpmmGenerator, SpmmStatusEnum};
-
+use super::{component::Component, SpmmGenerator, SpmmStatus, SpmmStatusEnum};
+use genawaiter::{rc::gen, yield_};
 pub struct TaskRouterConfig {}
 
 pub struct TaskRouter {
@@ -24,11 +24,9 @@ impl TaskRouter {
 }
 
 impl Component for TaskRouter {
-    fn run(self) -> Box<SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
-            let (_time, status) = context.into_inner();
-
-            yield status.clone_with_state(SpmmStatusEnum::Continue);
-        })
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
+        Box::new(gen!({
+            yield_!(original_status.clone_with_state(SpmmStatusEnum::Continue));
+        }))
     }
 }

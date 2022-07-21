@@ -1,10 +1,10 @@
-use desim::ResourceId;
-use log::debug;
-
 use super::{
-    component::Component, merger_status::MergerStatusId, LevelId, SpmmContex, SpmmStatusEnum,
-    StateWithSharedStatus,
+    component::Component, merger_status::MergerStatusId, LevelId, SpmmContex, SpmmStatus,
+    SpmmStatusEnum, StateWithSharedStatus,
 };
+use genawaiter::{rc::gen, yield_};
+use log::debug;
+use qsim::ResourceId;
 #[derive(Debug)]
 pub struct MergerWorkerDispatcher {
     pub level_id: LevelId,
@@ -18,14 +18,14 @@ pub struct MergerWorkerDispatcher {
 }
 
 impl Component for MergerWorkerDispatcher {
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        Box::new(gen!({
             // first get the task
 
-            let (_time, original_status) = context.into_inner();
             loop {
-                let task: SpmmContex =
-                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.full_sum_in));
+                let task: SpmmContex = yield_!(
+                    original_status.clone_with_state(SpmmStatusEnum::Pop(self.full_sum_in))
+                );
                 let (_, ret_status) = task.into_inner();
                 let StateWithSharedStatus {
                     status,
@@ -45,11 +45,13 @@ impl Component for MergerWorkerDispatcher {
                     "MergerWorkerDispatcher-{:?}: send full sum:{:?} to merger worker:{:?},real_id:{:?}",
                     self.level_id, target_result, target_pe,self.merger_task_sender[target_pe]
                 );
-                yield original_status.clone_with_state(SpmmStatusEnum::PushFullPartialTask(
-                    self.merger_task_sender[target_pe],
-                    (target_row, target_result),
-                ));
+                yield_!(
+                    original_status.clone_with_state(SpmmStatusEnum::PushFullPartialTask(
+                        self.merger_task_sender[target_pe],
+                        (target_row, target_result),
+                    ))
+                );
             }
-        })
+        }))
     }
 }

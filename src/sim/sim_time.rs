@@ -10,6 +10,7 @@
 use std::{cell::UnsafeCell, collections::BTreeMap};
 
 use log::info;
+use serde::Serialize;
 
 /// the time statistics of all components
 ///
@@ -22,13 +23,31 @@ use log::info;
 /// see the unsafe block in the functions for more information.
 #[derive(Default, Debug)]
 pub struct SharedNamedTime {
-    data: UnsafeCell<Vec<(String, NamedTime)>>,
+    /// vec of <name, tags, time>
+    data: UnsafeCell<Vec<(String, Vec<String>, NamedTime)>>,
 }
 
 /// the id to identify a component, use this instead of usize to prevent using arbitrary id or id created by other StaticSimTime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedTimeId {
     inner: usize,
+}
+#[derive(Serialize)]
+pub struct TimeStats {
+    /// real time, total time
+    pub status: BTreeMap<String, (f64, f64)>,
+}
+
+impl TimeStats {
+    pub fn to_rate(self) -> Vec<(String, f64)> {
+        self.status
+            .into_iter()
+            .map(|(name, (idle, total))| {
+                let rate = idle / total;
+                (name, rate)
+            })
+            .collect()
+    }
 }
 
 impl SharedNamedTime {
@@ -42,15 +61,25 @@ impl SharedNamedTime {
     ///- the id of the named time(for a new component)
     /// ## description
     ///- the id should be used to add idle time later in the component by using `add_idle_time`
-    pub fn add_component(&self) -> NamedTimeId {
+    #[allow(dead_code)]
+    fn add_component(&self) -> NamedTimeId {
         let default_name = "default".to_string();
-        self.add_component_with_name(default_name)
+        self.add_component_with_name(default_name, vec!["default"])
     }
 
-    pub fn add_component_with_name(&self, name: impl Into<String>) -> NamedTimeId {
+    /// ## return
+    pub fn add_component_with_name(
+        &self,
+        name: impl Into<String>,
+        tags: Vec<impl Into<String>>,
+    ) -> NamedTimeId {
         unsafe {
             let data = &mut *self.data.get();
-            data.push((name.into(), NamedTime::new()));
+            data.push((
+                name.into(),
+                tags.into_iter().map(|x| x.into()).collect(),
+                NamedTime::new(),
+            ));
             NamedTimeId {
                 inner: data.len() - 1,
             }
@@ -63,10 +92,10 @@ impl SharedNamedTime {
     ///- `id`: the id of the component in the array
     ///- `name`: the name of idle time that need to be added
     ///- `idle_time`: the idle time need to be added to the old one
-    pub unsafe fn add_idle_time(&self, id: NamedTimeId, name: &str, idle_time: f64) {
+    pub unsafe fn add_idle_time(&self, id: &NamedTimeId, name: &str, idle_time: f64) {
         let data = &mut *self.data.get();
         data.get_unchecked_mut(id.inner)
-            .1
+            .2
             .add_idle_time(name, idle_time);
     }
 
@@ -74,11 +103,31 @@ impl SharedNamedTime {
         info!("total_time: {}", sim_time);
         unsafe {
             let data = &*self.data.get();
-            for (name, time) in data.iter() {
+            for (name, _tags, time) in data.iter() {
                 info!("{}", name);
                 time.show_data(sim_time);
             }
         }
+    }
+
+    pub fn get_stats(&self, sim_time: f64) -> TimeStats {
+        let mut stats = TimeStats {
+            status: BTreeMap::new(),
+        };
+        unsafe {
+            let data = &*self.data.get();
+            for (_name, tags, time) in data.iter() {
+                for tag_name in tags {
+                    for (inner_name, inner_time) in &time.data {
+                        let full_name = format!("{}:{}", tag_name, inner_name);
+                        let mut entry = stats.status.entry(full_name).or_insert((0.0, 0.0));
+                        entry.0 += inner_time;
+                        entry.1 += sim_time;
+                    }
+                }
+            }
+        }
+        stats
     }
 }
 
@@ -88,7 +137,7 @@ impl SharedNamedTime {
 /// - you don't need to create a entry, just use `add_idle_time` to add a idle time. if it's the first time to add a idle time, it will create a new entry.
 #[derive(Default, Debug)]
 struct NamedTime {
-    data: BTreeMap<String, f64>,
+    pub data: BTreeMap<String, f64>,
 }
 impl NamedTime {
     fn new() -> Self {

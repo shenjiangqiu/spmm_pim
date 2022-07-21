@@ -4,12 +4,12 @@
 
 use std::collections::VecDeque;
 
-use log::debug;
-
 use super::{
-    buffer_status::BufferStatusId, component::Component, LevelId, SpmmContex, SpmmStatusEnum,
-    StateWithSharedStatus,
+    buffer_status::BufferStatusId, component::Component, sim_time::NamedTimeId, LevelId,
+    SpmmContex, SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
 };
+use genawaiter::rc::{Co, Gen};
+use log::debug;
 /// # the signal collector and decide which row to be fetched
 #[derive(Debug)]
 pub struct PartialSumSignalCollector {
@@ -18,29 +18,40 @@ pub struct PartialSumSignalCollector {
     pub queue_id_ready_out: usize,
 
     pub buffer_status_id: BufferStatusId,
+
+    pub named_sim_time: NamedTimeId,
 }
 
 impl Component for PartialSumSignalCollector {
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let mut current_time = 0.;
             // currently cannot receive the data, store the signal
             let mut temp_signal_queue: VecDeque<_> = Default::default();
 
-            let (_time, original_status) = context.into_inner();
-
             loop {
                 // first get the signal
-                let signal_context: SpmmContex = yield original_status
-                    .clone_with_state(super::SpmmStatusEnum::Pop(self.queue_id_signal_in));
+                let signal_context: SpmmContex = co
+                    .yield_(
+                        original_status
+                            .clone_with_state(super::SpmmStatusEnum::Pop(self.queue_id_signal_in)),
+                    )
+                    .await;
                 let (time, signal_status) = signal_context.into_inner();
-                let _gap = time - current_time;
-                current_time = time;
-
                 let StateWithSharedStatus {
                     status,
                     shared_status,
                 } = signal_status.into_inner();
+                let _gap = time - current_time;
+                current_time = time;
+                unsafe {
+                    shared_status.shared_named_time.add_idle_time(
+                        &self.named_sim_time,
+                        "get_signal",
+                        _gap,
+                    );
+                }
+
                 match status {
                     SpmmStatusEnum::PushSignal(_rid, signal) => {
                         if unsafe {
@@ -64,12 +75,28 @@ impl Component for PartialSumSignalCollector {
                                 self.level_id,
                                 (signal.self_queue_id,signal.target_id, finished),self.queue_id_ready_out
                             );
-                            yield original_status.clone_with_state(
-                                SpmmStatusEnum::PushReadyQueueId(
-                                    self.queue_id_ready_out,
-                                    (signal.self_queue_id, signal.target_id, finished),
-                                ),
-                            );
+                            let context = co
+                                .yield_(original_status.clone_with_state(
+                                    SpmmStatusEnum::PushReadyQueueId(
+                                        self.queue_id_ready_out,
+                                        (signal.self_queue_id, signal.target_id, finished),
+                                    ),
+                                ))
+                                .await;
+                            let (time, status) = context.into_inner();
+                            let gap = time - current_time;
+                            current_time = time;
+                            let StateWithSharedStatus {
+                                status: _,
+                                shared_status,
+                            } = status.into_inner();
+                            unsafe {
+                                shared_status.shared_named_time.add_idle_time(
+                                    &self.named_sim_time,
+                                    "send_ready_queue_id",
+                                    gap,
+                                );
+                            }
                         } else {
                             // cannot receive now, store it and resume it later
                             debug!("PartialSumSignalCollector-{:?}: receive PushSignal:{:?} but cannot send now",self.level_id, signal);
@@ -100,12 +127,29 @@ impl Component for PartialSumSignalCollector {
                                     "PartialSumSignalCollector-{:?}: invoke PushSignal:{:?}",
                                     self.level_id, signal
                                 );
-                                yield original_status.clone_with_state(
-                                    SpmmStatusEnum::PushReadyQueueId(
-                                        self.queue_id_ready_out,
-                                        (signal.self_queue_id, signal.target_id, finished),
-                                    ),
-                                );
+                                let context = co
+                                    .yield_(original_status.clone_with_state(
+                                        SpmmStatusEnum::PushReadyQueueId(
+                                            self.queue_id_ready_out,
+                                            (signal.self_queue_id, signal.target_id, finished),
+                                        ),
+                                    ))
+                                    .await;
+                                let (time, status) = context.into_inner();
+                                let gap = time - current_time;
+                                current_time = time;
+                                let StateWithSharedStatus {
+                                    status: _,
+                                    shared_status,
+                                } = status.into_inner();
+                                unsafe {
+                                    shared_status.shared_named_time.add_idle_time(
+                                        &self.named_sim_time,
+                                        "send_ready_queue_id_for_trigger",
+                                        gap,
+                                    );
+                                }
+
                                 debug!(
                                     "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?}",
                                     self.level_id,
@@ -120,10 +164,12 @@ impl Component for PartialSumSignalCollector {
                         }
                     }
                     _ => {
-                        panic!("PartialSumSignalCollector-{:?}: error!", self.level_id)
+                        unreachable!("...should never reach here");
                     }
                 };
             }
-        })
+        };
+
+        Box::new(Gen::new(function))
     }
 }

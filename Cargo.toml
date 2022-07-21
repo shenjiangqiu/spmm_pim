@@ -11,10 +11,12 @@ crate-type = ["cdylib", "rlib"]
 clap = {version = "3.1.18", features = ["derive"]}
 clap_complete = "3.1.2"
 config = "0.13.1"
-desim = {git = "https://github.com/shenjiangqiu/desim.git"}
+# desim = {git = "https://github.com/shenjiangqiu/desim.git"}
+qsim = {git = "https://github.com/shenjiangqiu/qsim"}
 # desim = {path = "../desim"}
 enum-as-inner = "0.5.0"
 eyre = "0.6.8"
+genawaiter = "0.99.1"
 hdrhistogram = "7.5.0"
 itertools = "0.10"
 log = "0.4.17"

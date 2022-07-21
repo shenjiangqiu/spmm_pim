@@ -2,7 +2,7 @@
 //!
 //!
 
-use desim::ResourceId;
+use qsim::ResourceId;
 
 use super::{
     buffer_status::BufferStatusId,
@@ -81,7 +81,7 @@ mod tests {
 
     // use std::{cell::RefCell, collections::BTreeMap, path::Path, rc::Rc};
 
-    // use desim::{
+    // use qsim::{
     //     resources::{CopyDefault, SimpleResource, Store},
     //     EndCondition, Simulation,
     // };

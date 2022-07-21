@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use desim::{ResourceId, SimContext};
+use crate::sim::StateWithSharedStatus;
+use genawaiter::rc::{Co, Gen};
 use itertools::Itertools;
 use log::debug;
-
-use crate::sim::StateWithSharedStatus;
+use qsim::{ResourceId, SimContext};
 
 use super::{
     buffer_status::BufferStatusId, component::Component, merger_status::MergerStatusId,
@@ -135,15 +135,17 @@ where
     T: MergerTaskSender + 'static,
 {
     /// the merger task sender
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
-            let (_time, original_status) = context.into_inner();
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let mut current_time = 0.;
             // first get the task
             loop {
                 // step 1: get the finished
-                let context: SimContext<SpmmStatus> =
-                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in()));
+                let context: SimContext<SpmmStatus> = co
+                    .yield_(
+                        original_status.clone_with_state(SpmmStatusEnum::Pop(self.get_task_in())),
+                    )
+                    .await;
                 debug!("MERGER_TSK_SD:id:{},{:?}", self.get_task_in(), context);
                 let (_time, task) = context.into_inner();
                 let gap = _time - current_time;
@@ -154,7 +156,7 @@ where
                 } = task.into_inner();
                 unsafe {
                     shared_status.shared_named_time.add_idle_time(
-                        *self.get_time_id(),
+                        self.get_time_id(),
                         "get_task",
                         gap,
                     );
@@ -182,25 +184,28 @@ where
                             );
                         }
 
-                        let context =
-                            yield original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                                lower_pe_id,
-                                BankTaskEnum::PushBankTask(BankTask {
-                                    from,
-                                    to,
-                                    row,
-                                    bank_id,
-                                    row_shift,
-                                    row_size,
-                                }),
-                            ));
+                        let context = co
+                            .yield_(
+                                original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                    lower_pe_id,
+                                    BankTaskEnum::PushBankTask(BankTask {
+                                        from,
+                                        to,
+                                        row,
+                                        bank_id,
+                                        row_shift,
+                                        row_size,
+                                    }),
+                                )),
+                            )
+                            .await;
                         let (_time, _status) = context.into_inner();
                         let gap = _time - current_time;
                         current_time = _time;
 
                         unsafe {
                             shared_status.shared_named_time.add_idle_time(
-                                *self.get_time_id(),
+                                self.get_time_id(),
                                 "push_bank_task",
                                 gap,
                             );
@@ -209,18 +214,20 @@ where
                     super::BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
                         for lower_pe_id in self.get_lower_pes().iter().cloned().collect_vec() {
-                            let context = yield original_status.clone_with_state(
-                                SpmmStatusEnum::PushBankTask(
-                                    lower_pe_id,
-                                    super::BankTaskEnum::EndThisTask,
-                                ),
-                            );
+                            let context = co
+                                .yield_(original_status.clone_with_state(
+                                    SpmmStatusEnum::PushBankTask(
+                                        lower_pe_id,
+                                        super::BankTaskEnum::EndThisTask,
+                                    ),
+                                ))
+                                .await;
                             let (_time, _status) = context.into_inner();
                             let gap = _time - current_time;
                             current_time = _time;
                             unsafe {
                                 shared_status.shared_named_time.add_idle_time(
-                                    *self.get_time_id(),
+                                    self.get_time_id(),
                                     "push_end_bank_task",
                                     gap,
                                 );
@@ -229,6 +236,7 @@ where
                     }
                 }
             }
-        })
+        };
+        Box::new(Gen::new(function))
     }
 }

@@ -1,10 +1,10 @@
 //! full result merger worker
 //! it receives the full partial result from the dispatcher and merger them and send it to merger sender
-
 use super::{
     component::Component, merger_status::MergerStatusId, FullTaskType, LevelId, SpmmContex,
-    SpmmStatusEnum, StateWithSharedStatus,
+    SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
 };
+use genawaiter::{rc::gen, yield_};
 #[derive(Debug)]
 pub struct FullResultMergerWorker {
     pub level_id: LevelId,
@@ -23,14 +23,12 @@ pub struct FullResultMergerWorker {
 }
 
 impl Component for FullResultMergerWorker {
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
-            let (_time, original_status) = context.into_inner();
-
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        Box::new(gen!({
             loop {
                 // first get the full partial Sum:
-                let context: SpmmContex = yield original_status
-                    .clone_with_state(SpmmStatusEnum::Pop(self.queue_id_partial_sum_in));
+                let context: SpmmContex = yield_!(original_status
+                    .clone_with_state(SpmmStatusEnum::Pop(self.queue_id_partial_sum_in)));
                 let (_time, status) = context.into_inner();
                 let StateWithSharedStatus {
                     status,
@@ -43,18 +41,20 @@ impl Component for FullResultMergerWorker {
                 // wait time in max(add_time, merge_time)
                 let wait_time = std::cmp::max(add_time, merge_time) as f64;
 
-                yield original_status.clone_with_state(SpmmStatusEnum::Wait(wait_time));
+                yield_!(original_status.clone_with_state(SpmmStatusEnum::Wait(wait_time)));
 
                 // release the resource
                 shared_status
                     .shared_merger_status
                     .release_merger(self.merger_status_id, self.id);
                 // send the partial result to the sender
-                yield original_status.clone_with_state(SpmmStatusEnum::PushPartialTask(
-                    self.queue_id_partial_sum_sender,
-                    (target_row, self.self_sender_id, partial_sum),
-                ));
+                yield_!(
+                    original_status.clone_with_state(SpmmStatusEnum::PushPartialTask(
+                        self.queue_id_partial_sum_sender,
+                        (target_row, self.self_sender_id, partial_sum),
+                    ))
+                );
             }
-        })
+        }))
     }
 }

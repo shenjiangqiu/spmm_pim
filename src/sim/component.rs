@@ -1,12 +1,12 @@
 //! this module contains the definition of the component trait
 //! - a component is a struct that can spawn a generator throw run() method
 
-use super::SpmmGenerator;
+use super::{SpmmGenerator, SpmmStatus};
 
 /// trait Component is the trait that every component should implement
 /// - example:
 /// ```ignore
-/// use desim::ResourceId;
+/// use qsim::ResourceId;
 /// use super::{component::Component, SpmmContex, SpmmGenerator, SpmmStatusEnum};
 /// pub struct TaskReordererSetting {}
 /// pub struct TaskReorderer {
@@ -69,5 +69,5 @@ pub trait Component {
     /// ```
     ///
     ///
-    fn run(self) -> Box<SpmmGenerator>;
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator>;
 }

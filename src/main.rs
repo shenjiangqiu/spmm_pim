@@ -1,4 +1,4 @@
-use std::io::{self};
+use std::io::{self, Write};
 use std::{env::args_os, fs::File};
 
 use clap::{Command, IntoApp, Parser};
@@ -7,6 +7,7 @@ use eyre::{Context, Result};
 use itertools::Itertools;
 use log::{debug, error, info};
 
+use spmm_pim::sim::AllTimeStats;
 use spmm_pim::{
     args::{Args, RunMode},
     result::{self, Results},
@@ -61,7 +62,7 @@ fn _main(args: Args) -> Result<()> {
         RunMode::Sim => {
             info!("sim start");
             let graph_name = settings.mtx_files;
-            let result_file = settings.result_file;
+            let mut all_results = AllTimeStats { data: Vec::new() };
             let results: Vec<eyre::Result<_>> = graph_name
                 .iter()
                 .map(|name| {
@@ -72,20 +73,17 @@ fn _main(args: Args) -> Result<()> {
                     let mtx_file_name = name.file_stem().unwrap();
                     let trans_pose = csr.transpose_view().to_csr();
                     let two_matrix = TwoMatrix::new(csr, trans_pose);
-                    spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?;
+                    let time_stats =
+                        spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?
+                            .to_rate();
+                    let file_path = mtx_file_name.to_string_lossy();
+                    serde_json::to_writer_pretty(
+                        File::create(format!("results/time_stats_{file_path}.json"))?,
+                        &time_stats,
+                    )?;
+                    all_results.data.push((file_path.to_string(), time_stats));
                     // write the result to file
-                    let file_name = format!(
-                        "{}_{}.txt",
-                        result_file.display(),
-                        mtx_file_name.to_str().unwrap()
-                    );
-                    let mut _file = File::create(&file_name)
-                        .wrap_err(format!("the path: {} is invalid!", file_name))?;
-                    // for i in result {
-                    //     writeln!(file, "{}", i)?;
-                    // }
 
-                    info!("finished graph: {:?}", name);
                     Ok(name)
                 })
                 .collect_vec();
@@ -95,6 +93,13 @@ fn _main(args: Args) -> Result<()> {
                     Err(e) => error!("{:?}", e),
                 }
             }
+            let time_stats_output = serde_json::to_string_pretty(&all_results)
+                .wrap_err("fail to serialize all_results")?;
+            // write the result to file "all_results.json"
+            let file_name = "results/time_stats_all_results.json";
+            let mut _file = File::create(&file_name)
+                .wrap_err(format!("the path: {} is invalid!", file_name))?;
+            writeln!(_file, "{}", time_stats_output)?;
             Ok(())
         }
         RunMode::Pim => {
@@ -143,17 +148,6 @@ mod test_main {
 
     #[test]
     fn test_main() {
-        let args = vec![
-            "spmm_pim",
-            "-r",
-            "pim",
-            "configs/default.toml",
-            "configs/ddr4.toml",
-        ];
-        let args = Args::parse_from(args);
-        println!("hello world!");
-        super::_main(args).unwrap();
-
         let args = vec![
             "spmm_pim",
             "-r",

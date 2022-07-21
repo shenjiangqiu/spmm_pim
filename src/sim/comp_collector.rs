@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+
 use std::fmt::Debug;
 
-use desim::{resources::Store, Simulation};
 use log::info;
+use qsim::{resources::Store, Simulation};
 
 use super::{component::Component, SpmmStatus};
+
 #[derive(Default)]
 pub struct QueueIdCollector {
     all_queue_ids: Vec<usize>,
@@ -36,7 +39,7 @@ impl ProcessInfoCollector {
         T: Debug + Component + 'static,
     {
         self.all_process_infos.push(format!("{:?}", process));
-        let id = sim.create_process(process.run());
+        let id = sim.create_process(process.run(status.clone()));
         sim.schedule_event(
             0.0,
             id,

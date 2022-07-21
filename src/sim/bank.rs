@@ -3,17 +3,18 @@ use std::{
     collections::{BTreeMap, VecDeque},
 };
 const BANK_ROW_SIZE: usize = 2048;
-use desim::ResourceId;
 use log::debug;
+use qsim::ResourceId;
 
 use super::{
-    component::Component, sim_time::NamedTimeId, BankID, BankTask, LevelId, SpmmContex,
+    component::Component, sim_time::NamedTimeId, BankID, BankTask, LevelId, SpmmContex, SpmmStatus,
     SpmmStatusEnum,
 };
 use crate::{
     pim::merge_rows_into_one,
     sim::{BankTaskEnum, StateWithSharedStatus},
 };
+use genawaiter::rc::{Co, Gen};
 //849191287
 
 /// merger status
@@ -126,17 +127,17 @@ impl BankPe {
 }
 
 impl Component for BankPe {
-    fn run(self) -> Box<super::SpmmGenerator> {
-        Box::new(move |context: SpmmContex| {
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // first get the task
-            let (_time, original_status) = context.into_inner();
             let mut current_task = 0;
             let mut tasks = vec![];
             // this is used for record the current time before each yield
             let mut current_time = 0.;
             loop {
-                let context: SpmmContex =
-                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
+                let context: SpmmContex = co
+                    .yield_(original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in)))
+                    .await;
                 let (time, pop_status) = context.into_inner();
                 debug!("BANK_PE: time: {},received taske: {:?}", time, pop_status);
                 let gap = time - current_time;
@@ -152,7 +153,7 @@ impl Component for BankPe {
                 let (_resouce_id, bank_task) = status.into_push_bank_task().unwrap();
                 unsafe {
                     shared_status.shared_named_time.add_idle_time(
-                        self.named_idle_time_id,
+                        &self.named_idle_time_id,
                         "get_task",
                         gap,
                     );
@@ -174,8 +175,19 @@ impl Component for BankPe {
                             // todo: refine the add cycle according to the adder size
                             let wait_time = cmp::max(add_cycle, merge_cycle) as f64;
                             shared_status.shared_sim_time.add_bank_merge(wait_time);
-                            let context = yield original_status
-                                .clone_with_state(SpmmStatusEnum::Wait(wait_time));
+                            unsafe {
+                                shared_status.shared_named_time.add_idle_time(
+                                    &self.named_idle_time_id,
+                                    "compute!",
+                                    wait_time,
+                                );
+                            }
+                            let context = co
+                                .yield_(
+                                    original_status
+                                        .clone_with_state(SpmmStatusEnum::Wait(wait_time)),
+                                )
+                                .await;
                             let (_time, status) = context.into_inner();
                             current_time = _time;
                             // this could be idle due to upper pressure
@@ -185,17 +197,18 @@ impl Component for BankPe {
                                 self.partial_out,
                                 (current_task, self.task_sender_input_id, &data)
                             );
-                            let context =
-                                yield status.clone_with_state(SpmmStatusEnum::PushPartialTask(
+                            let context = co
+                                .yield_(status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                                     self.partial_out,
                                     (current_task, self.task_sender_input_id, data),
-                                ));
+                                )))
+                                .await;
                             let (_time, _status) = context.into_inner();
                             let return_gap = _time - current_time;
                             current_time = _time;
                             unsafe {
                                 shared_status.shared_named_time.add_idle_time(
-                                    self.named_idle_time_id,
+                                    &self.named_idle_time_id,
                                     "return_to_chip",
                                     return_gap,
                                 );
@@ -206,7 +219,9 @@ impl Component for BankPe {
                     }
                 };
             }
-        })
+        };
+
+        Box::new(Gen::new(function))
     }
 }
 
@@ -228,18 +243,18 @@ pub struct BankTaskReorder {
 // TODO
 impl Component for BankTaskReorder {
     #[allow(unused_assignments)]
-    fn run(self) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
         let num_pes = self.task_out.len();
-        Box::new(move |context: SpmmContex| {
+        let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // todo delete this
             let mut current_target_pe = 0;
             let mut current_row = 0;
-            let (_time, original_status) = context.into_inner();
             let mut current_time = 0.;
             loop {
                 // first get the context
-                let context: SpmmContex =
-                    yield original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in));
+                let context: SpmmContex = co
+                    .yield_(original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in)))
+                    .await;
                 let (time, pop_status) = context.into_inner();
                 let gap = time - current_time;
                 // TODO: add the idle time to the comp_time
@@ -255,7 +270,7 @@ impl Component for BankTaskReorder {
                 unsafe {
                     // safety: the comp_id is set by add_comp, that should be valid!
                     shared_status.shared_named_time.add_idle_time(
-                        self.comp_id,
+                        &self.comp_id,
                         "get_task_from_chip",
                         gap,
                     );
@@ -284,54 +299,90 @@ impl Component for BankTaskReorder {
                             for _i in inner_row_id_start..inner_row_id_end {
                                 // TODO , read the setting
                                 total_waiting += 16.;
-                                let context = yield original_status
-                                    .clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let context = co
+                                    .yield_(
+                                        original_status.clone_with_state(SpmmStatusEnum::Wait(16.)),
+                                    )
+                                    .await;
                                 let (_time, _status) = context.into_inner();
                                 current_time = _time;
                             }
                         } else {
                             for _i in inner_row_id_start..=inner_row_id_end {
                                 total_waiting += 16.;
-                                let context = yield original_status
-                                    .clone_with_state(SpmmStatusEnum::Wait(16.));
+                                let context = co
+                                    .yield_(
+                                        original_status.clone_with_state(SpmmStatusEnum::Wait(16.)),
+                                    )
+                                    .await;
                                 let (_time, _status) = context.into_inner();
                                 current_time = _time;
                             }
                         }
 
                         shared_status.shared_sim_time.add_bank_read(total_waiting);
+                        unsafe {
+                            shared_status.shared_named_time.add_idle_time(
+                                &self.comp_id,
+                                "read_row_buffer",
+                                total_waiting,
+                            );
+                        }
                         current_row = inner_row_id_end;
 
-                        let context =
-                            yield original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                                self.task_out[current_target_pe],
-                                BankTaskEnum::PushBankTask(BankTask {
-                                    from,
-                                    to,
-                                    row,
-                                    bank_id,
-                                    row_shift,
-                                    row_size,
-                                }),
-                            ));
+                        let context = co
+                            .yield_(
+                                original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                    self.task_out[current_target_pe],
+                                    BankTaskEnum::PushBankTask(BankTask {
+                                        from,
+                                        to,
+                                        row,
+                                        bank_id,
+                                        row_shift,
+                                        row_size,
+                                    }),
+                                )),
+                            )
+                            .await;
                         let (_time, _status) = context.into_inner();
+                        let gap = _time - current_time;
                         current_time = _time;
+                        unsafe {
+                            shared_status.shared_named_time.add_idle_time(
+                                &self.comp_id,
+                                "push_bank_task",
+                                gap,
+                            );
+                        }
                     }
                     BankTaskEnum::EndThisTask => {
                         // end this task
                         // push this to current_taget_pe and switch to the next
-                        let context =
-                            yield original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
-                                self.task_out[current_target_pe],
-                                BankTaskEnum::EndThisTask,
-                            ));
+                        let context = co
+                            .yield_(
+                                original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
+                                    self.task_out[current_target_pe],
+                                    BankTaskEnum::EndThisTask,
+                                )),
+                            )
+                            .await;
                         let (_time, _status) = context.into_inner();
+                        let gap = _time - current_time;
                         current_time = _time;
+                        unsafe {
+                            shared_status.shared_named_time.add_idle_time(
+                                &self.comp_id,
+                                "push_bank_task",
+                                gap,
+                            );
+                        }
                         current_target_pe = (current_target_pe + 1) % num_pes;
                     }
                 }
             }
-        })
+        };
+        Box::new(Gen::new(function))
     }
 }
 
@@ -360,7 +411,7 @@ impl BankTaskReorder {
 mod test {
     use std::{path::Path, rc::Rc};
 
-    use desim::{resources::Store, EndCondition, Simulation};
+    use qsim::{resources::Store, EndCondition, Simulation};
 
     use crate::{
         settings::RowMapping,
@@ -394,7 +445,7 @@ mod test {
         let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
 
         let final_receiver = FinalReceiver::new(partial_return, false, &two_mat);
-        let final_receiver_process = simulator.create_process(final_receiver.run());
+        let final_receiver_process = simulator.create_process(final_receiver.run(status.clone()));
         simulator.schedule_event(
             0.0,
             final_receiver_process,
@@ -413,7 +464,7 @@ mod test {
             task_pe
         };
 
-        let comp_id = shared_named_time.add_component_with_name("123");
+        let comp_id = shared_named_time.add_component_with_name("123", vec!["test"]);
         let bank_task_reorder = BankTaskReorder::new(
             LevelId::Dimm,
             task_in,
@@ -426,7 +477,7 @@ mod test {
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
-                let comp_id = shared_named_time.add_component_with_name("123");
+                let comp_id = shared_named_time.add_component_with_name("123", vec!["test"]);
                 let pe_comp = BankPe::new(
                     LevelId::Bank(Default::default()),
                     0,
@@ -441,8 +492,8 @@ mod test {
             }
             pes
         };
-        let bank_task_reorder = simulator.create_process(bank_task_reorder.run());
-        let task_sender = simulator.create_process(task_sender.run());
+        let bank_task_reorder = simulator.create_process(bank_task_reorder.run(status.clone()));
+        let task_sender = simulator.create_process(task_sender.run(status.clone()));
 
         simulator.schedule_event(
             0.0,
@@ -455,7 +506,7 @@ mod test {
             status.clone_with_state(SpmmStatusEnum::Continue),
         );
         for pe in bank_pes {
-            let pe_process = simulator.create_process(pe.run());
+            let pe_process = simulator.create_process(pe.run(status.clone()));
             simulator.schedule_event(
                 0.0,
                 pe_process,

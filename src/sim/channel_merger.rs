@@ -2,7 +2,7 @@
 //!
 //!
 
-use desim::ResourceId;
+use qsim::ResourceId;
 
 use super::{
     buffer_status::BufferStatusId,
