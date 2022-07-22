@@ -1,7 +1,12 @@
 use eyre::Result;
 use log::debug;
 
-use spmm_pim::{run_2d_unroll_buf,utils::run::run_exp_csr,result::{Results,self}, settings::Settings};
+use spmm_pim::{
+    result::{self, Results},
+    run_2d_unroll_buf,
+    settings::Settings,
+    utils::run::run_exp_csr,
+};
 use sprs::CsMat;
 use std::path::{Path, PathBuf};
 

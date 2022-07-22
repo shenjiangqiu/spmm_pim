@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{self, Write};
 use std::{env::args_os, fs::File};
 
@@ -58,6 +59,7 @@ fn _main(args: Args) -> Result<()> {
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files.clone();
     let run_mode = args.run_mode.unwrap_or(RunMode::Sim);
+    fs::create_dir_all("results")?;
     match run_mode {
         RunMode::Sim => {
             info!("sim start");

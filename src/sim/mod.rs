@@ -364,7 +364,10 @@ fn build_dimm(
             Box::new(Store::new(store_size)),
             "dispatcher_to_merger_dimm",
         );
-
+        let named_sim_time = shared_status.shared_named_time.add_component_with_name(
+            "DIMM_MERGER_TASK_WORKER",
+            vec!["dimm_merger_task_worker", "merger_task_worker"],
+        );
         let merger_task_worker = FullResultMergerWorker {
             level_id: LevelId::Dimm,
             id: i,
@@ -373,6 +376,7 @@ fn build_dimm(
             self_sender_id: task_send_store,
             merger_status_id,
             merger_width: mem_settings.dimm_merger_size,
+            named_sim_time,
         };
         p_collector.create_process_and_schedule(sim, merger_task_worker, &status);
         task_receiver.push(full_partial_sum_in);
@@ -507,7 +511,10 @@ fn build_channel(
                 Box::new(Store::new(store_size)),
                 "dispatcher_to_merger_channel",
             );
-
+            let named_sim_time = shared_status.shared_named_time.add_component_with_name(
+                "channel_merger_task_worker",
+                vec!["merger_task_worker", "channel_merger_task_worker"],
+            );
             let merger_task_worker = FullResultMergerWorker {
                 level_id: LevelId::Channel(channel_id),
                 id: i,
@@ -516,6 +523,7 @@ fn build_channel(
                 self_sender_id: dimm_to_channel_task_sender,
                 merger_status_id,
                 merger_width: mem_settings.channel_merger_size,
+                named_sim_time,
             };
             p_collector.create_process_and_schedule(sim, merger_task_worker, &status);
             task_receiver.push(resouce);
@@ -643,7 +651,10 @@ fn build_chip(
                 Box::new(Store::new(store_size)),
                 "dispatcher_to_merger_chip",
             );
-
+            let named_sim_time = shared_status.shared_named_time.add_component_with_name(
+                "chip_merger_task_worker",
+                vec!["merger_task_worker", "chip_merger_task_worker"],
+            );
             let merger_task_worker = FullResultMergerWorker {
                 level_id: LevelId::Chip(chip_id),
                 id: i,
@@ -652,6 +663,7 @@ fn build_chip(
                 self_sender_id: store_id,
                 merger_status_id,
                 merger_width: mem_settings.chip_merger_size,
+                named_sim_time,
             };
             p_collector.create_process_and_schedule(sim, merger_task_worker, &status);
             task_receiver.push(resouce);

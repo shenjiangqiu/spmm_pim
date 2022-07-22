@@ -1,10 +1,10 @@
 //! full result merger worker
 //! it receives the full partial result from the dispatcher and merger them and send it to merger sender
 use super::{
-    component::Component, merger_status::MergerStatusId, FullTaskType, LevelId, SpmmContex,
-    SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
+    component::Component, merger_status::MergerStatusId, sim_time::NamedTimeId, FullTaskType,
+    LevelId, SpmmContex, SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
 };
-use genawaiter::{rc::gen, yield_};
+use genawaiter::rc::{Co, Gen};
 #[derive(Debug)]
 pub struct FullResultMergerWorker {
     pub level_id: LevelId,
@@ -20,20 +20,36 @@ pub struct FullResultMergerWorker {
 
     // the merger width
     pub merger_width: usize,
+    pub named_sim_time: NamedTimeId,
 }
 
 impl Component for FullResultMergerWorker {
     fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
-        Box::new(gen!({
+        let function = |co: Co<SpmmStatus, SpmmContex>| async move {
+            let mut current_time = 0.;
             loop {
                 // first get the full partial Sum:
-                let context: SpmmContex = yield_!(original_status
-                    .clone_with_state(SpmmStatusEnum::Pop(self.queue_id_partial_sum_in)));
+                let context: SpmmContex = co
+                    .yield_(
+                        original_status
+                            .clone_with_state(SpmmStatusEnum::Pop(self.queue_id_partial_sum_in)),
+                    )
+                    .await;
                 let (_time, status) = context.into_inner();
+                let gap = _time - current_time;
+                current_time = _time;
                 let StateWithSharedStatus {
                     status,
                     shared_status,
                 } = status.into_inner();
+
+                unsafe {
+                    shared_status.shared_named_time.add_idle_time(
+                        &self.named_sim_time,
+                        "get_partial_sum_in",
+                        gap,
+                    );
+                }
                 let full_result: FullTaskType = status.into_push_full_partial_task().unwrap().1;
                 let (target_row, total_result) = full_result;
                 let (add_time, merge_time, partial_sum) =
@@ -41,20 +57,45 @@ impl Component for FullResultMergerWorker {
                 // wait time in max(add_time, merge_time)
                 let wait_time = std::cmp::max(add_time, merge_time) as f64;
 
-                yield_!(original_status.clone_with_state(SpmmStatusEnum::Wait(wait_time)));
-
+                let context = co
+                    .yield_(original_status.clone_with_state(SpmmStatusEnum::Wait(wait_time)))
+                    .await;
+                let (_time, _status) = context.into_inner();
+                let gap = _time - current_time;
+                unsafe {
+                    shared_status.shared_named_time.add_idle_time(
+                        &self.named_sim_time,
+                        "merge_time!",
+                        gap,
+                    );
+                }
+                current_time = _time;
                 // release the resource
                 shared_status
                     .shared_merger_status
                     .release_merger(self.merger_status_id, self.id);
                 // send the partial result to the sender
-                yield_!(
-                    original_status.clone_with_state(SpmmStatusEnum::PushPartialTask(
-                        self.queue_id_partial_sum_sender,
-                        (target_row, self.self_sender_id, partial_sum),
-                    ))
-                );
+                let context = co
+                    .yield_(
+                        original_status.clone_with_state(SpmmStatusEnum::PushPartialTask(
+                            self.queue_id_partial_sum_sender,
+                            (target_row, self.self_sender_id, partial_sum),
+                        )),
+                    )
+                    .await;
+                let (_time, _status) = context.into_inner();
+                let gap = _time - current_time;
+                current_time = _time;
+                unsafe {
+                    shared_status.shared_named_time.add_idle_time(
+                        &self.named_sim_time,
+                        "send_partial_sum_out",
+                        gap,
+                    );
+                }
             }
-        }))
+        };
+
+        Box::new(Gen::new(function))
     }
 }

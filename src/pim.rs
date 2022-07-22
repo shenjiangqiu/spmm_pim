@@ -145,7 +145,6 @@ pub fn get_bank_id_from_row_id(
             } else {
                 row_id / rows_per_bank
             };
-            
 
             if bank_id >= num_banks {
                 row_id % num_banks
