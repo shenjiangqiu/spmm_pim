@@ -31,12 +31,17 @@ impl Component for PartialSumSignalCollector {
 
             loop {
                 // first get the signal
+                debug!(
+                    "PartialSumSignalCollector-{:?}:,try to get signal",
+                    self.level_id
+                );
                 let signal_context: SpmmContex = co
                     .yield_(
                         original_status
                             .clone_with_state(super::SpmmStatusEnum::Pop(self.queue_id_signal_in)),
                     )
                     .await;
+
                 let (time, signal_status) = signal_context.into_inner();
                 let StateWithSharedStatus {
                     status,
@@ -44,34 +49,29 @@ impl Component for PartialSumSignalCollector {
                 } = signal_status.into_inner();
                 let _gap = time - current_time;
                 current_time = time;
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "get_signal",
-                        _gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "get_signal",
+                    _gap,
+                );
 
                 match status {
                     SpmmStatusEnum::PushSignal(_rid, signal) => {
-                        if unsafe {
-                            shared_status
-                                .shared_buffer_status
-                                .can_receive(&self.buffer_status_id, signal.target_id)
-                        } {
-                            let finished = unsafe {
-                                shared_status.shared_buffer_status.receive(
-                                    &self.buffer_status_id,
-                                    signal.target_id,
-                                    signal.self_sender_id,
-                                )
-                            };
+                        if shared_status
+                            .shared_buffer_status
+                            .can_receive(&self.buffer_status_id, signal.target_id)
+                        {
+                            let finished = shared_status.shared_buffer_status.receive(
+                                &self.buffer_status_id,
+                                signal.target_id,
+                                signal.self_sender_id,
+                            );
                             debug!(
                                 "PartialSumSignalCollector-{:?}:,target_id:{},finished:{}, receive PushSignal:{:?}",
                                 self.level_id,signal.target_id,finished, signal
                             );
                             debug!(
-                                "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?},queue_id:{}",
+                                "PartialSumSignalCollector-{:?}: try to send PushReadyQueueId:{:?},queue_id:{}",
                                 self.level_id,
                                 (signal.self_queue_id,signal.target_id, finished),self.queue_id_ready_out
                             );
@@ -83,6 +83,11 @@ impl Component for PartialSumSignalCollector {
                                     ),
                                 ))
                                 .await;
+                            debug!(
+                                    "PartialSumSignalCollector-{:?}: finished send PushReadyQueueId:{:?},queue_id:{}",
+                                    self.level_id,
+                                    (signal.self_queue_id,signal.target_id, finished),self.queue_id_ready_out
+                                );
                             let (time, status) = context.into_inner();
                             let gap = time - current_time;
                             current_time = time;
@@ -90,16 +95,20 @@ impl Component for PartialSumSignalCollector {
                                 status: _,
                                 shared_status,
                             } = status.into_inner();
-                            unsafe {
-                                shared_status.shared_named_time.add_idle_time(
-                                    &self.named_sim_time,
-                                    "send_ready_queue_id",
-                                    gap,
-                                );
-                            }
+                            shared_status.shared_named_time.add_idle_time(
+                                &self.named_sim_time,
+                                "send_ready_queue_id",
+                                gap,
+                            );
                         } else {
                             // cannot receive now, store it and resume it later
                             debug!("PartialSumSignalCollector-{:?}: receive PushSignal:{:?} but cannot send now",self.level_id, signal);
+                            debug!(
+                                "the reason cannot receive:{:?}",
+                                shared_status
+                                    .shared_buffer_status
+                                    .get_current_status(&self.buffer_status_id)
+                            );
                             temp_signal_queue.push_back(signal);
                         }
                     }
@@ -111,21 +120,18 @@ impl Component for PartialSumSignalCollector {
                         // a buffer entry is popped, resume the signal
 
                         while let Some(signal) = temp_signal_queue.pop_front() {
-                            if unsafe {
-                                shared_status
-                                    .shared_buffer_status
-                                    .can_receive(&self.buffer_status_id, signal.target_id)
-                            } {
-                                let finished = unsafe {
-                                    shared_status.shared_buffer_status.receive(
-                                        &self.buffer_status_id,
-                                        signal.target_id,
-                                        signal.self_sender_id,
-                                    )
-                                };
+                            if shared_status
+                                .shared_buffer_status
+                                .can_receive(&self.buffer_status_id, signal.target_id)
+                            {
+                                let finished = shared_status.shared_buffer_status.receive(
+                                    &self.buffer_status_id,
+                                    signal.target_id,
+                                    signal.self_sender_id,
+                                );
                                 debug!(
-                                    "PartialSumSignalCollector-{:?}: invoke PushSignal:{:?}",
-                                    self.level_id, signal
+                                    "PartialSumSignalCollector-{:?}:try to invoke PushSignal:{:?} queue_id:{}",
+                                    self.level_id, signal,self.queue_id_ready_out
                                 );
                                 let context = co
                                     .yield_(original_status.clone_with_state(
@@ -142,13 +148,11 @@ impl Component for PartialSumSignalCollector {
                                     status: _,
                                     shared_status,
                                 } = status.into_inner();
-                                unsafe {
-                                    shared_status.shared_named_time.add_idle_time(
-                                        &self.named_sim_time,
-                                        "send_ready_queue_id_for_trigger",
-                                        gap,
-                                    );
-                                }
+                                shared_status.shared_named_time.add_idle_time(
+                                    &self.named_sim_time,
+                                    "send_ready_queue_id_for_trigger",
+                                    gap,
+                                );
 
                                 debug!(
                                     "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?}",

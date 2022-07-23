@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 pub mod args;
 pub mod bsr;
 pub mod bsr_row_builder;
@@ -66,7 +67,9 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         row_change_latency: 8,
         bank_adder_size: 8,
         store_size: 1,
-        buffer_lines: 10,
+        dimm_buffer_lines: 8,
+        channel_buffer_lines: 8,
+        chip_buffer_lines: 8,
     };
     let csr: CsMat<_> = tri.to_csr();
 

@@ -23,14 +23,14 @@ use enum_as_inner::EnumAsInner;
 use genawaiter::Coroutine;
 use id_translation::*;
 use itertools::Itertools;
-use log::debug;
+use log::{debug, error, info};
 use qsim::{
     prelude::*,
     resources::{CopyDefault, Store},
 };
 use serde::Serialize;
 use sprs::CsMat;
-use std::{cell::RefCell, collections::BTreeMap, path::Path, rc::Rc};
+use std::{cell::RefCell, collections::BTreeMap, fmt::Debug, path::Path, rc::Rc};
 
 use self::{
     bank::{BankPe, BankTaskReorder},
@@ -134,7 +134,7 @@ pub struct StateWithSharedStatus {
     pub shared_status: SharedStatus,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SpmmStatus {
     pub state: SpmmStatusEnum,
 
@@ -142,6 +142,14 @@ pub struct SpmmStatus {
     pub enable_log: bool,
     pub shared_status: SharedStatus,
 }
+impl Debug for SpmmStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpmmStatus")
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
 impl CopyDefault for SpmmStatus {
     fn copy_default(&self) -> Self {
         let enable_log = self.enable_log;
@@ -314,7 +322,7 @@ fn build_dimm(
         .add_component_with_name("DIMMSENDER_GETID", vec!["dimm"]);
     let buffer_status_id = shared_status
         .shared_buffer_status
-        .add_component(mem_settings.buffer_lines);
+        .add_component(mem_settings.dimm_buffer_lines);
 
     let signal_in = sim.create_resource(Box::new(Store::new(128)), "signal_dimm");
     let ready_id_queue = sim.create_resource(Box::new(Store::new(128)), "ready_dimm");
@@ -439,7 +447,7 @@ fn build_channel(
             .add_component_with_name("channel_sender", vec!["channel_task_sender", "task_sender"]);
         let buffer_status_id = shared_status
             .shared_buffer_status
-            .add_component(mem_settings.buffer_lines);
+            .add_component(mem_settings.channel_buffer_lines);
 
         let signal_in = sim.create_resource(Box::new(Store::new(128)), "signal_channel");
         let ready_queueid = sim.create_resource(Box::new(Store::new(128)), "ready_channel");
@@ -581,7 +589,7 @@ fn build_chip(
             .add_component_with_name("chip_sender", vec!["chip_task_sender", "task_sender"]);
         let buffer_status_id = shared_status
             .shared_buffer_status
-            .add_component(mem_settings.buffer_lines);
+            .add_component(mem_settings.chip_buffer_lines);
 
         let signal_in = sim.create_resource(Box::new(Store::new(128)), "signal_chip");
         let ready_queueid = sim.create_resource(Box::new(Store::new(128)), "ready_chip");
@@ -716,9 +724,10 @@ fn build_bank(
             .map(|_i| sim.create_resource(Box::new(Store::new(store_size)), "bank_to_pe"))
             .collect_vec();
 
-        let comp_id = shared_status
-            .shared_named_time
-            .add_component_with_name("bank_sender", vec!["bank_task_sender", "task_sender"]);
+        let comp_id = shared_status.shared_named_time.add_component_with_name(
+            &format!("bank_reorder-{bank_id:?}"),
+            vec!["bank_bank_reorder", "bank_reorder"],
+        );
         let bank = BankTaskReorder::new(
             LevelId::Bank(bank_id),
             store_id,
@@ -783,6 +792,7 @@ impl Simulator {
         mem_settings: &MemSettings,
         input_matrix: TwoMatrix<i32, i32>,
     ) -> Result<TimeStats, eyre::Report> {
+        let total_rows = input_matrix.a.rows();
         let store_size = mem_settings.store_size;
         // now we need a stucture to map the sim_time id to the real component time
 
@@ -816,7 +826,13 @@ impl Simulator {
 
         let final_receiver_resouce =
             sim.create_resource(Box::new(Store::new(store_size)), "final_receiver");
-        let final_rev = FinalReceiver::new(final_receiver_resouce, true, &input_matrix);
+        let all_received = Rc::new(RefCell::new(Vec::new()));
+        let final_rev = FinalReceiver::new(
+            final_receiver_resouce,
+            true,
+            &input_matrix,
+            all_received.clone(),
+        );
 
         p_collector.create_process_and_schedule(&mut sim, final_rev, &status);
         // this store connect the task sender and the Dimm
@@ -851,11 +867,24 @@ impl Simulator {
         let sim = sim.run(EndCondition::NoEvents);
         // validate the result
 
-        // info!("{}", sim.print_resources());
+        info!("{}", sim.print_resources());
         let time = sim.time();
         status.shared_status.shared_named_time.show_data(time);
         let time_stats = status.shared_status.shared_named_time.get_stats(time);
-
+        info!(
+            "all_received: count: {:?}, min: {:?}, max: {:?}",
+            all_received.borrow().len(),
+            all_received.borrow().iter().min(),
+            all_received.borrow().iter().max(),
+        );
+        info!("original_matrix: {}", total_rows);
+        if all_received.borrow().len() != total_rows {
+            error!(
+                "the received data is not correct,received: {},should be:{}",
+                all_received.borrow().len(),
+                total_rows
+            );
+        }
         Ok(time_stats)
     }
 }
@@ -902,7 +931,9 @@ mod test {
             row_change_latency: 8,
             bank_adder_size: 8,
             store_size: 1,
-            buffer_lines: 10,
+            dimm_buffer_lines: 2,
+            channel_buffer_lines: 2,
+            chip_buffer_lines: 2,
         };
         Simulator::run(&mem_settings, two_matrix).unwrap();
     }

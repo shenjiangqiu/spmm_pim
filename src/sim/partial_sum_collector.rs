@@ -36,6 +36,10 @@ impl Component for PartialSumCollector {
 
             let mut current_time = 0.;
             loop {
+                debug!(
+                    "PartialSumCollector-{:?}:try to receive queue id at id: {}",
+                    self.level_id, self.queue_id_ready_in
+                );
                 let ready_queue_context: SpmmContex = co
                     .yield_(
                         original_status
@@ -50,18 +54,20 @@ impl Component for PartialSumCollector {
                     status,
                     shared_status,
                 } = ready_queue_status.into_inner();
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "get_queue_id",
-                        _gap,
-                    );
-                };
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "get_queue_id",
+                    _gap,
+                );
 
                 let (ready_queue_id, target_row, is_last) =
                     status.into_push_ready_queue_id().unwrap().1;
                 debug!(
-                    "PartialSumCollector-{:?}: receive ready queue id:{:?}",
+                    "PartialSumCollector-{:?}: receive ready queue id: {:?}",
+                    self.level_id, ready_queue_id
+                );
+                debug!(
+                    "PartialSumCollector-{:?}: try to receive data: ready queue id: {:?}",
                     self.level_id, ready_queue_id
                 );
                 let partial_sum_context: SpmmContex = co
@@ -78,19 +84,17 @@ impl Component for PartialSumCollector {
                     status,
                     shared_status: _,
                 } = partial_sum_status.into_inner();
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "get_data",
-                        _gap,
-                    );
-                };
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "get_data",
+                    _gap,
+                );
                 let (target_row2, _source_pe_id, result): PartialResultTaskType =
                     status.into_push_partial_task().unwrap().1;
                 assert_eq!(target_row, target_row2,"the signal queue target id is not equal to the data id the queue_id is:{ready_queue_id}, check is the queue is poped by other first??");
                 debug!(
-                    "PartialSumCollector-{:?}: receive partial sum:{:?}",
-                    self.level_id, result
+                    "PartialSumCollector-{:?}: receive partial from sum id: {:?}",
+                    self.level_id, ready_queue_id
                 );
                 current_partial_sum
                     .entry(target_row)
@@ -99,8 +103,8 @@ impl Component for PartialSumCollector {
                 if is_last {
                     let finished_result = current_partial_sum.remove(&target_row).unwrap();
                     debug!(
-                            "PartialSumCollector-{:?}:self_queue_id_in:{}, push full partial sum:{:?} of target row:{target_row}",
-                            self.level_id,self.queue_id_ready_in, finished_result
+                            "PartialSumCollector-{:?}:self_queue_id_in id: {}, try to push full partial sum to id: {},:{:?} of target row:{target_row}",
+                            self.level_id,self.queue_id_full_result_out,self.queue_id_ready_in, finished_result
                         );
                     // push to partial sum dispatcher
                     let context = co
@@ -111,21 +115,23 @@ impl Component for PartialSumCollector {
                             ),
                         ))
                         .await;
+                    debug!(
+                            "PartialSumCollector-{:?}:self_queue_id_in id: {}, finish push full partial sum of target row:{target_row}",
+                            self.level_id,self.queue_id_ready_in
+                        );
                     let (time, _status) = context.into_inner();
                     let gap = time - current_time;
                     current_time = time;
 
                     // fix bug here!
-                    unsafe {
-                        shared_status
-                            .shared_buffer_status
-                            .remove(&self.buffer_status_id, target_row);
-                        shared_status.shared_named_time.add_idle_time(
-                            &self.named_sim_time,
-                            "push_full_partial_task",
-                            gap,
-                        );
-                    }
+                    shared_status
+                        .shared_buffer_status
+                        .remove(&self.buffer_status_id, target_row);
+                    shared_status.shared_named_time.add_idle_time(
+                        &self.named_sim_time,
+                        "push_full_partial_task",
+                        gap,
+                    );
                     // push to signal collector
                     let context = co
                         .yield_(original_status.clone_with_state(
@@ -137,13 +143,11 @@ impl Component for PartialSumCollector {
                     let (time, _status) = context.into_inner();
                     let gap = time - current_time;
                     current_time = time;
-                    unsafe {
-                        shared_status.shared_named_time.add_idle_time(
-                            &self.named_sim_time,
-                            "push_buffer_pop_signal",
-                            gap,
-                        );
-                    }
+                    shared_status.shared_named_time.add_idle_time(
+                        &self.named_sim_time,
+                        "push_buffer_pop_signal",
+                        gap,
+                    );
                     debug!("PartialSumCollector-{:?}: push signal", self.level_id);
                 }
                 // need to test if this partial_result is already finished(all sub tasks are finished)

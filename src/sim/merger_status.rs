@@ -1,4 +1,4 @@
-use std::cell::UnsafeCell;
+use std::cell::RefCell;
 
 use log::debug;
 
@@ -23,14 +23,15 @@ impl MergerStatus {
     /// select a new merger and push a task into it.
     pub fn get_next_merger(&mut self) -> usize {
         // find a merger with least on_going_task_num
+        debug!("current_ongoing: {:?}", &self.current_on_going_task_num);
+
         let min = self
             .current_on_going_task_num
             .iter_mut()
             .enumerate()
-            .min()
+            .min_by(|(_, a), (_, b)| a.cmp(&b))
             .unwrap();
         *min.1 += 1;
-
         debug!("find next merger:id: {}, new_size: {}", min.0, min.1);
         min.0
     }
@@ -47,7 +48,7 @@ impl MergerStatus {
 /// This is the merger status, it is used to store the merger status.
 #[derive(Debug, Default)]
 pub struct SharedMergerStatus {
-    inner: UnsafeCell<Vec<MergerStatus>>,
+    inner: RefCell<Vec<MergerStatus>>,
 }
 #[derive(Debug, Clone, Copy)]
 pub struct MergerStatusId {
@@ -56,32 +57,18 @@ pub struct MergerStatusId {
 
 impl SharedMergerStatus {
     pub fn add_component(&self, total_merger: usize) -> MergerStatusId {
-        let inner = unsafe { &mut *self.inner.get() };
+        let mut inner = self.inner.borrow_mut();
         inner.push(MergerStatus::new(total_merger));
         MergerStatusId {
             id: inner.len() - 1,
         }
     }
     pub fn get_next_merger(&self, id: MergerStatusId) -> usize {
-        let inner = unsafe { &mut *self.inner.get() };
+        let mut inner = self.inner.borrow_mut();
         inner[id.id].get_next_merger()
     }
     pub fn release_merger(&self, id: MergerStatusId, merger_id: usize) {
-        let inner = unsafe { &mut *self.inner.get() };
+        let mut inner = self.inner.borrow_mut();
         inner[id.id].release_merger(merger_id);
-    }
-
-    /// ## Safety
-    /// the id should be valid.
-    pub unsafe fn get_next_merger_unchecked(&self, id: MergerStatusId) -> usize {
-        let inner = &mut *self.inner.get();
-        inner.get_unchecked_mut(id.id).get_next_merger()
-    }
-
-    /// ## Safety
-    /// the id should be valid.
-    pub unsafe fn release_merger_unchecked(&self, id: MergerStatusId, merger_id: usize) {
-        let inner = &mut *self.inner.get();
-        inner.get_unchecked_mut(id.id).release_merger(merger_id);
     }
 }

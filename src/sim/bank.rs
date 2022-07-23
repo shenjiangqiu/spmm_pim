@@ -151,13 +151,11 @@ impl Component for BankPe {
                 } = pop_status.into_inner();
 
                 let (_resouce_id, bank_task) = status.into_push_bank_task().unwrap();
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_idle_time_id,
-                        "get_task",
-                        gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_idle_time_id,
+                    "get_task",
+                    gap,
+                );
                 match bank_task {
                     BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
                         debug!("BANK_PE: receive task: to: row: {},{:?}", to, row);
@@ -175,13 +173,11 @@ impl Component for BankPe {
                             // todo: refine the add cycle according to the adder size
                             let wait_time = cmp::max(add_cycle, merge_cycle) as f64;
                             shared_status.shared_sim_time.add_bank_merge(wait_time);
-                            unsafe {
-                                shared_status.shared_named_time.add_idle_time(
-                                    &self.named_idle_time_id,
-                                    "compute!",
-                                    wait_time,
-                                );
-                            }
+                            shared_status.shared_named_time.add_idle_time(
+                                &self.named_idle_time_id,
+                                "compute!",
+                                wait_time,
+                            );
                             let context = co
                                 .yield_(
                                     original_status
@@ -206,13 +202,11 @@ impl Component for BankPe {
                             let (_time, _status) = context.into_inner();
                             let return_gap = _time - current_time;
                             current_time = _time;
-                            unsafe {
-                                shared_status.shared_named_time.add_idle_time(
-                                    &self.named_idle_time_id,
-                                    "return_to_chip",
-                                    return_gap,
-                                );
-                            }
+                            shared_status.shared_named_time.add_idle_time(
+                                &self.named_idle_time_id,
+                                "return_to_chip",
+                                return_gap,
+                            );
                         }
 
                         tasks.clear();
@@ -267,14 +261,12 @@ impl Component for BankTaskReorder {
                     status,
                     shared_status,
                 } = pop_status.into_inner();
-                unsafe {
-                    // safety: the comp_id is set by add_comp, that should be valid!
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.comp_id,
-                        "get_task_from_chip",
-                        gap,
-                    );
-                }
+                // safety: the comp_id is set by add_comp, that should be valid!
+                shared_status.shared_named_time.add_idle_time(
+                    &self.comp_id,
+                    "get_task_from_chip",
+                    gap,
+                );
 
                 let (_resouce_id, task) = status.into_push_bank_task().unwrap();
 
@@ -321,13 +313,11 @@ impl Component for BankTaskReorder {
                         }
 
                         shared_status.shared_sim_time.add_bank_read(total_waiting);
-                        unsafe {
-                            shared_status.shared_named_time.add_idle_time(
-                                &self.comp_id,
-                                "read_row_buffer",
-                                total_waiting,
-                            );
-                        }
+                        shared_status.shared_named_time.add_idle_time(
+                            &self.comp_id,
+                            "read_row_buffer",
+                            total_waiting,
+                        );
                         current_row = inner_row_id_end;
 
                         let context = co
@@ -348,13 +338,11 @@ impl Component for BankTaskReorder {
                         let (_time, _status) = context.into_inner();
                         let gap = _time - current_time;
                         current_time = _time;
-                        unsafe {
-                            shared_status.shared_named_time.add_idle_time(
-                                &self.comp_id,
-                                "push_bank_task",
-                                gap,
-                            );
-                        }
+                        shared_status.shared_named_time.add_idle_time(
+                            &self.comp_id,
+                            "push_bank_task",
+                            gap,
+                        );
                     }
                     BankTaskEnum::EndThisTask => {
                         // end this task
@@ -370,13 +358,11 @@ impl Component for BankTaskReorder {
                         let (_time, _status) = context.into_inner();
                         let gap = _time - current_time;
                         current_time = _time;
-                        unsafe {
-                            shared_status.shared_named_time.add_idle_time(
-                                &self.comp_id,
-                                "push_bank_task",
-                                gap,
-                            );
-                        }
+                        shared_status.shared_named_time.add_idle_time(
+                            &self.comp_id,
+                            "push_bank_task",
+                            gap,
+                        );
                         current_target_pe = (current_target_pe + 1) % num_pes;
                     }
                 }
@@ -409,7 +395,7 @@ impl BankTaskReorder {
 }
 #[cfg(test)]
 mod test {
-    use std::{path::Path, rc::Rc};
+    use std::{cell::RefCell, path::Path, rc::Rc};
 
     use qsim::{resources::Store, EndCondition, Simulation};
 
@@ -443,8 +429,8 @@ mod test {
         let task_in = simulator.create_resource(Box::new(Store::new(16)), "test");
         // create a final receiver for partial sum:
         let partial_return = simulator.create_resource(Box::new(Store::new(16)), "test");
-
-        let final_receiver = FinalReceiver::new(partial_return, false, &two_mat);
+        let all_received = Rc::new(RefCell::new(Vec::new()));
+        let final_receiver = FinalReceiver::new(partial_return, false, &two_mat, all_received);
         let final_receiver_process = simulator.create_process(final_receiver.run(status.clone()));
         simulator.schedule_event(
             0.0,

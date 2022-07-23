@@ -43,13 +43,11 @@ impl Component for FullResultMergerWorker {
                     shared_status,
                 } = status.into_inner();
 
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "get_partial_sum_in",
-                        gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "get_partial_sum_in",
+                    gap,
+                );
                 let full_result: FullTaskType = status.into_push_full_partial_task().unwrap().1;
                 let (target_row, total_result) = full_result;
                 let (add_time, merge_time, partial_sum) =
@@ -62,13 +60,11 @@ impl Component for FullResultMergerWorker {
                     .await;
                 let (_time, _status) = context.into_inner();
                 let gap = _time - current_time;
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "merge_time!",
-                        gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "merge_time!",
+                    gap,
+                );
                 current_time = _time;
                 // release the resource
                 shared_status
@@ -86,13 +82,11 @@ impl Component for FullResultMergerWorker {
                 let (_time, _status) = context.into_inner();
                 let gap = _time - current_time;
                 current_time = _time;
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "send_partial_sum_out",
-                        gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "send_partial_sum_out",
+                    gap,
+                );
             }
         };
 

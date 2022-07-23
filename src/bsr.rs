@@ -39,15 +39,7 @@ impl<const R: usize, const C: usize, N> From<Bsr<R, C, N>> for CsMat<[[N; C]; R]
         } = bsr;
         let storage = ptr.into_raw_storage();
         // this is safe when the BSR is a valid BSR, so it's safe!
-        unsafe {
-            CsMat::new_unchecked(
-                sprs::CompressedStorage::CSR,
-                (rows, cols),
-                storage,
-                index,
-                data,
-            )
-        }
+        CsMat::new((rows, cols), storage, index, data)
     }
 }
 

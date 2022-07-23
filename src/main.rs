@@ -154,7 +154,7 @@ mod test_main {
             "spmm_pim",
             "-r",
             "sim",
-            "configs/default.toml",
+            "configs/large.toml",
             "configs/ddr4.toml",
         ];
         let args = Args::parse_from(args);

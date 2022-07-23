@@ -48,14 +48,12 @@ impl Component for MergerWorker {
                     status,
                     shared_status,
                 } = pop_status.into_inner();
-                unsafe {
-                    // Safety: the comp_id is valid!
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.time_id,
-                        "wait_task",
-                        idle_time,
-                    );
-                }
+                // Safety: the comp_id is valid!
+                shared_status.shared_named_time.add_idle_time(
+                    &self.time_id,
+                    "wait_task",
+                    idle_time,
+                );
                 let (_resouce_id, (target_row, target_result)) =
                     status.into_push_full_partial_task().unwrap();
                 // first we need pop from the
@@ -83,13 +81,11 @@ impl Component for MergerWorker {
                     .await;
                 let (_time, _push_status) = context.into_inner();
                 let return_idle_time = _time - current_time;
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.time_id,
-                        "push_partial",
-                        return_idle_time,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.time_id,
+                    "push_partial",
+                    return_idle_time,
+                );
                 current_time = _time;
 
                 // release the merger status

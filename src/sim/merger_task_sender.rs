@@ -154,13 +154,9 @@ where
                     status,
                     shared_status,
                 } = task.into_inner();
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        self.get_time_id(),
-                        "get_task",
-                        gap,
-                    );
-                }
+                shared_status
+                    .shared_named_time
+                    .add_idle_time(self.get_time_id(), "get_task", gap);
                 let task = status.into_push_bank_task().unwrap().1;
 
                 match task {
@@ -176,13 +172,11 @@ where
                         let lower_pe_id = self.get_lower_id(&bank_id);
 
                         // record that the task is on going to lower_pe_id, record it!
-                        unsafe {
-                            shared_status.shared_buffer_status.add_waiting(
-                                self.get_buffer_id(),
-                                to,
-                                lower_pe_id,
-                            );
-                        }
+                        shared_status.shared_buffer_status.add_waiting(
+                            self.get_buffer_id(),
+                            to,
+                            lower_pe_id,
+                        );
 
                         let context = co
                             .yield_(
@@ -203,13 +197,11 @@ where
                         let gap = _time - current_time;
                         current_time = _time;
 
-                        unsafe {
-                            shared_status.shared_named_time.add_idle_time(
-                                self.get_time_id(),
-                                "push_bank_task",
-                                gap,
-                            );
-                        }
+                        shared_status.shared_named_time.add_idle_time(
+                            self.get_time_id(),
+                            "push_bank_task",
+                            gap,
+                        );
                     }
                     super::BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
@@ -225,13 +217,11 @@ where
                             let (_time, _status) = context.into_inner();
                             let gap = _time - current_time;
                             current_time = _time;
-                            unsafe {
-                                shared_status.shared_named_time.add_idle_time(
-                                    self.get_time_id(),
-                                    "push_end_bank_task",
-                                    gap,
-                                );
-                            }
+                            shared_status.shared_named_time.add_idle_time(
+                                self.get_time_id(),
+                                "push_end_bank_task",
+                                gap,
+                            );
                         }
                     }
                 }

@@ -58,19 +58,17 @@ impl Component for PartialSumSender {
                     status,
                     shared_status,
                 } = status.into_inner();
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "get_partial_sum",
-                        _gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "get_partial_sum",
+                    _gap,
+                );
 
                 let (_resouce_id, partial_task): (usize, PartialResultTaskType) =
                     status.into_push_partial_task().unwrap();
                 debug!(
-                    "PartialSumSender-{:?}: receive partial sum:{:?}",
-                    self.level_id, partial_task
+                    "PartialSumSender-{:?}: receive partial sum:{},{}",
+                    self.level_id, partial_task.0, partial_task.1
                 );
 
                 let target_id = partial_task.0;
@@ -99,13 +97,15 @@ impl Component for PartialSumSender {
                     status: _,
                     shared_status,
                 } = status.into_inner();
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "send_signal",
-                        _gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "send_signal",
+                    _gap,
+                );
+                debug!(
+                    "PartialSumSender-{:?}: ready to provide data at queue id: {} data:{:?}",
+                    self.level_id, self.queue_id_partial_sum_out, partial_task
+                );
                 // then send the real partial sum out
                 let context: SpmmContex = co
                     .yield_(original_status.clone_with_state(
@@ -116,19 +116,17 @@ impl Component for PartialSumSender {
                     ))
                     .await;
                 debug!(
-                    "PartialSumSender-{:?}: send data to:{:?}",
+                    "PartialSumSender-{:?}: send data to id: {:?}",
                     self.level_id, self.queue_id_partial_sum_out
                 );
                 let (time, _status) = context.into_inner();
                 let _gap = time - current_time;
                 current_time = time;
-                unsafe {
-                    shared_status.shared_named_time.add_idle_time(
-                        &self.named_sim_time,
-                        "send_partial_sum",
-                        _gap,
-                    );
-                }
+                shared_status.shared_named_time.add_idle_time(
+                    &self.named_sim_time,
+                    "send_partial_sum",
+                    _gap,
+                );
             }
         };
 

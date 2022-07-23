@@ -7,7 +7,7 @@
 //! - the unbanlence of each row
 //!   - get every level's max time and min time
 
-use std::{cell::UnsafeCell, collections::BTreeMap};
+use std::{cell::RefCell, collections::BTreeMap};
 
 use log::info;
 use serde::Serialize;
@@ -24,7 +24,7 @@ use serde::Serialize;
 #[derive(Default, Debug)]
 pub struct SharedNamedTime {
     /// vec of <name, tags, time>
-    data: UnsafeCell<Vec<(String, Vec<String>, NamedTime)>>,
+    data: RefCell<Vec<(String, Vec<String>, NamedTime)>>,
 }
 
 /// the id to identify a component, use this instead of usize to prevent using arbitrary id or id created by other StaticSimTime.
@@ -53,7 +53,7 @@ impl TimeStats {
 impl SharedNamedTime {
     pub fn new() -> Self {
         SharedNamedTime {
-            data: UnsafeCell::new(Vec::new()),
+            data: RefCell::new(Vec::new()),
         }
     }
 
@@ -73,16 +73,14 @@ impl SharedNamedTime {
         name: impl Into<String>,
         tags: Vec<impl Into<String>>,
     ) -> NamedTimeId {
-        unsafe {
-            let data = &mut *self.data.get();
-            data.push((
-                name.into(),
-                tags.into_iter().map(|x| x.into()).collect(),
-                NamedTime::new(),
-            ));
-            NamedTimeId {
-                inner: data.len() - 1,
-            }
+        let mut data = self.data.borrow_mut();
+        data.push((
+            name.into(),
+            tags.into_iter().map(|x| x.into()).collect(),
+            NamedTime::new(),
+        ));
+        NamedTimeId {
+            inner: data.len() - 1,
         }
     }
 
@@ -92,21 +90,20 @@ impl SharedNamedTime {
     ///- `id`: the id of the component in the array
     ///- `name`: the name of idle time that need to be added
     ///- `idle_time`: the idle time need to be added to the old one
-    pub unsafe fn add_idle_time(&self, id: &NamedTimeId, name: &str, idle_time: f64) {
-        let data = &mut *self.data.get();
-        data.get_unchecked_mut(id.inner)
+    pub fn add_idle_time(&self, id: &NamedTimeId, name: &str, idle_time: f64) {
+        let mut data = self.data.borrow_mut();
+        data.get_mut(id.inner)
+            .unwrap()
             .2
             .add_idle_time(name, idle_time);
     }
 
     pub fn show_data(&self, sim_time: f64) {
         info!("total_time: {}", sim_time);
-        unsafe {
-            let data = &*self.data.get();
-            for (name, _tags, time) in data.iter() {
-                info!("{}", name);
-                time.show_data(sim_time);
-            }
+        let data = self.data.borrow_mut();
+        for (name, _tags, time) in data.iter() {
+            info!("{}", name);
+            time.show_data(sim_time);
         }
     }
 
@@ -114,16 +111,14 @@ impl SharedNamedTime {
         let mut stats = TimeStats {
             status: BTreeMap::new(),
         };
-        unsafe {
-            let data = &*self.data.get();
-            for (_name, tags, time) in data.iter() {
-                for tag_name in tags {
-                    for (inner_name, inner_time) in &time.data {
-                        let full_name = format!("{}:{}", tag_name, inner_name);
-                        let mut entry = stats.status.entry(full_name).or_insert((0.0, 0.0));
-                        entry.0 += inner_time;
-                        entry.1 += sim_time;
-                    }
+        let data = self.data.borrow();
+        for (_name, tags, time) in data.iter() {
+            for tag_name in tags {
+                for (inner_name, inner_time) in &time.data {
+                    let full_name = format!("{}:{}", tag_name, inner_name);
+                    let mut entry = stats.status.entry(full_name).or_insert((0.0, 0.0));
+                    entry.0 += inner_time;
+                    entry.1 += sim_time;
                 }
             }
         }
@@ -172,7 +167,7 @@ impl NamedTime {
 /// - this structure should be instantiated by each component
 #[derive(Default, Debug)]
 pub struct ComponentTime {
-    pub componet_idle_time: UnsafeCell<Vec<(String, Vec<f64>)>>,
+    pub componet_idle_time: RefCell<Vec<(String, Vec<f64>)>>,
 }
 impl ComponentTime {
     pub fn new() -> Self {
@@ -180,29 +175,31 @@ impl ComponentTime {
     }
     /// # (⸝⸝•‧̫•⸝⸝)
     pub fn add_component(&self, name: impl Into<String>) -> usize {
-        unsafe {
-            let vec = &mut *self.componet_idle_time.get();
-            vec.push((name.into(), vec![]));
-            vec.len() - 1
-        }
+        let mut vec = self.componet_idle_time.borrow_mut();
+        vec.push((name.into(), vec![]));
+        vec.len() - 1
     }
     /// # (˶˚ ᗨ ˚˶)
     /// take care! the component_id should be valid that returned by add_component
     /// # Safety
     /// the component_id should be valid
-    pub unsafe fn get_idle_time(&self, component_id: usize) -> &(String, Vec<f64>) {
-        (*self.componet_idle_time.get()).get_unchecked(component_id)
+    pub fn get_idle_time(&self, component_id: usize) -> (String, Vec<f64>) {
+        let vec = self.componet_idle_time.borrow();
+        let v = vec.get(component_id).unwrap();
+        v.clone()
     }
 
     /// # (Ծ‸Ծ)
     /// take care! the component_id should be valid that returned by add_component
     /// # Safety
     /// the component_id should be valid
-    pub unsafe fn add_idle_time(&self, component_id: usize, idle_time: f64) {
+    pub fn add_idle_time(&self, component_id: usize, idle_time: f64) {
         // add the idle time to current idle time
 
-        (*self.componet_idle_time.get())
-            .get_unchecked_mut(component_id)
+        self.componet_idle_time
+            .borrow_mut()
+            .get_mut(component_id)
+            .unwrap()
             .1
             .push(idle_time);
     }
@@ -214,7 +211,7 @@ impl ComponentTime {
 #[derive(Default, Debug)]
 pub struct LevelTime {
     // (f64,f64) means finished time and gap between finished time and first coming time
-    pub level_finished_time: UnsafeCell<Vec<Vec<(f64, f64)>>>,
+    pub level_finished_time: RefCell<Vec<Vec<(f64, f64)>>>,
 }
 
 /// levelTimeId is used to identify a level, use this instead of usize to prevent using arbitrary id or id created by other StaticSimTime.
@@ -228,12 +225,10 @@ impl LevelTime {
         Default::default()
     }
     pub fn add_level(&self) -> LevelTimeId {
-        unsafe {
-            let vec = &mut *self.level_finished_time.get();
-            vec.push(vec![]);
-            LevelTimeId {
-                inner: vec.len() - 1,
-            }
+        let mut vec = self.level_finished_time.borrow_mut();
+        vec.push(vec![]);
+        LevelTimeId {
+            inner: vec.len() - 1,
         }
     }
     /// # ( ´◔ ‸◔`)
@@ -242,8 +237,12 @@ impl LevelTime {
     /// the level_id should be valid
     /// -  return
     ///  the (finished time, gap time) of all target rows of this level
-    pub unsafe fn get_finished_time(&self, level_id: LevelTimeId) -> &Vec<(f64, f64)> {
-        (*self.level_finished_time.get()).get_unchecked(level_id.inner)
+    pub fn get_finished_time(&self, level_id: LevelTimeId) -> Vec<(f64, f64)> {
+        self.level_finished_time
+            .borrow()
+            .get(level_id.inner)
+            .unwrap()
+            .clone()
     }
     /// # (˶˚ ᗨ ˚˶)
     /// take care! the level_id should be valid that returned by add_level
@@ -251,8 +250,12 @@ impl LevelTime {
     /// the level_id should be valid
     /// # args
     /// - time: the vec of (finished time, gap time)
-    pub unsafe fn set_finished_time(&self, level_id: LevelTimeId, time: Vec<(f64, f64)>) {
-        *(*self.level_finished_time.get()).get_unchecked_mut(level_id.inner) = time;
+    pub fn set_finished_time(&self, level_id: LevelTimeId, time: Vec<(f64, f64)>) {
+        *self
+            .level_finished_time
+            .borrow_mut()
+            .get_mut(level_id.inner)
+            .unwrap() = time;
     }
     /// # (｡•ᴗ-)_
     /// take care! the level_id should be valid that returned by add_level
@@ -260,11 +263,13 @@ impl LevelTime {
     /// the level_id should be valid
     /// # args:
     /// - time: the (finished time, gap time)
-    pub unsafe fn add_finished_time(&self, level_id: LevelTimeId, time: (f64, f64)) {
+    pub fn add_finished_time(&self, level_id: LevelTimeId, time: (f64, f64)) {
         // add the idle time to current idle time
 
-        (*self.level_finished_time.get())
-            .get_unchecked_mut(level_id.inner)
+        self.level_finished_time
+            .borrow_mut()
+            .get_mut(level_id.inner)
+            .unwrap()
             .push(time);
     }
 }
@@ -280,7 +285,7 @@ pub struct SimTime {
 /// this structure is used to record the simulation time of each banks time break!
 #[derive(Debug, Default)]
 pub struct SharedSimTime {
-    pub inner: UnsafeCell<SimTime>,
+    pub inner: RefCell<SimTime>,
 }
 
 impl SharedSimTime {
@@ -289,66 +294,46 @@ impl SharedSimTime {
     }
 
     pub fn add_bank_read(&self, time: f64) {
-        unsafe {
-            let mut inner = &mut *self.inner.get();
-            inner.bank_read += time;
-        }
+        let mut inner = self.inner.borrow_mut();
+        inner.bank_read += time;
     }
     pub fn get_bank_read(&self) -> f64 {
-        unsafe {
-            let inner = &*self.inner.get();
-            inner.bank_read
-        }
+        let inner = self.inner.borrow();
+        inner.bank_read
     }
     pub fn add_bank_merge(&self, time: f64) {
-        unsafe {
-            let mut inner = &mut *self.inner.get();
-            inner.bank_merge += time;
-        }
+        let mut inner = self.inner.borrow_mut();
+        inner.bank_merge += time;
     }
     pub fn get_bank_merge(&self) -> f64 {
-        unsafe {
-            let inner = &*self.inner.get();
-            inner.bank_merge
-        }
+        let inner = self.inner.borrow();
+        inner.bank_merge
     }
     pub fn add_chip_merge(&self, time: f64) {
-        unsafe {
-            let mut inner = &mut *self.inner.get();
-            inner.chip_merge += time;
-        }
+        let mut inner = self.inner.borrow_mut();
+        inner.chip_merge += time;
     }
     pub fn get_chip_merge(&self) -> f64 {
-        unsafe {
-            let inner = &*self.inner.get();
-            inner.chip_merge
-        }
+        let inner = self.inner.borrow();
+        inner.chip_merge
     }
 
     pub fn add_channel_merge(&self, time: f64) {
-        unsafe {
-            let mut inner = &mut *self.inner.get();
-            inner.channel_merge += time;
-        }
+        let mut inner = self.inner.borrow_mut();
+        inner.channel_merge += time;
     }
     pub fn get_channel_merge(&self) -> f64 {
-        unsafe {
-            let inner = &*self.inner.get();
-            inner.channel_merge
-        }
+        let inner = self.inner.borrow();
+        inner.channel_merge
     }
 
     pub fn add_dimm_merge(&self, time: f64) {
-        unsafe {
-            let mut inner = &mut *self.inner.get();
-            inner.dimm_merge += time;
-        }
+        let mut inner = self.inner.borrow_mut();
+        inner.dimm_merge += time;
     }
     pub fn get_dimm_merge(&self) -> f64 {
-        unsafe {
-            let inner = &*self.inner.get();
-            inner.dimm_merge
-        }
+        let inner = self.inner.borrow();
+        inner.dimm_merge
     }
 }
 
@@ -360,15 +345,11 @@ mod tests {
         let comp_time = ComponentTime::new();
         let comp1 = comp_time.add_component("comp1".to_string());
         let comp2 = comp_time.add_component("comp2".to_string());
-        unsafe {
-            comp_time.add_idle_time(comp1, 1.3);
-            comp_time.add_idle_time(comp1, 1.3);
-            comp_time.add_idle_time(comp2, 2.3);
-        }
-        unsafe {
-            assert_eq!(comp_time.get_idle_time(comp1).1, vec![1.3, 1.3]);
-            assert_eq!(comp_time.get_idle_time(comp2).1, vec![2.3]);
-        }
+        comp_time.add_idle_time(comp1, 1.3);
+        comp_time.add_idle_time(comp1, 1.3);
+        comp_time.add_idle_time(comp2, 2.3);
+        assert_eq!(comp_time.get_idle_time(comp1).1, vec![1.3, 1.3]);
+        assert_eq!(comp_time.get_idle_time(comp2).1, vec![2.3]);
     }
 
     #[test]
@@ -376,17 +357,13 @@ mod tests {
         let level_time = LevelTime::new();
         let level1 = level_time.add_level();
         let level2 = level_time.add_level();
-        unsafe {
-            level_time.add_finished_time(level1, (1.3, 1.3));
-            level_time.add_finished_time(level1, (2.3, 2.3));
-            level_time.add_finished_time(level2, (3.3, 3.3));
-        }
-        unsafe {
-            assert_eq!(
-                level_time.get_finished_time(level1),
-                &vec![(1.3, 1.3), (2.3, 2.3)]
-            );
-            assert_eq!(level_time.get_finished_time(level2), &vec![(3.3, 3.3)]);
-        }
+        level_time.add_finished_time(level1, (1.3, 1.3));
+        level_time.add_finished_time(level1, (2.3, 2.3));
+        level_time.add_finished_time(level2, (3.3, 3.3));
+        assert_eq!(
+            level_time.get_finished_time(level1),
+            vec![(1.3, 1.3), (2.3, 2.3)]
+        );
+        assert_eq!(level_time.get_finished_time(level2), vec![(3.3, 3.3)]);
     }
 }

@@ -5,14 +5,18 @@ banks = 8
 
 dimm_merger_count = 16
 dimm_merger_size = 16
+dimm_buffer_lines = 16
+
 
 channel_merger_count = 8
 channel_merger_size = 16
+channel_buffer_lines = 8
 
 channels = 2
 
 chip_merger_count = 8
 chip_merger_size = 16
+chip_buffer_lines = 8
 
 chips = 8
 
@@ -23,6 +27,5 @@ row_size = 512
 simd_width = 8
 
 bank_adder_size = 16
-buffer_lines = 16
 row_change_latency = 33
 store_size = 8

@@ -1,7 +1,7 @@
 //! the buffer status to control whether to receive a new line from lower pe
 
 use std::{
-    cell::UnsafeCell,
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt::Debug,
 };
@@ -145,11 +145,11 @@ impl BufferStatus {
 /// ```
 #[derive(Default)]
 pub struct SharedBufferStatus {
-    pub inner: UnsafeCell<Vec<BufferStatus>>,
+    pub inner: RefCell<Vec<BufferStatus>>,
 }
 impl Debug for SharedBufferStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SharedBufferStatus {:?}", unsafe { &*self.inner.get() })
+        write!(f, "SharedBufferStatus {:?}", self.inner.borrow())
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -160,7 +160,7 @@ pub struct BufferStatusId {
 impl SharedBufferStatus {
     #[must_use]
     pub fn add_component(&self, buffer_rows: usize) -> BufferStatusId {
-        let inner = unsafe { &mut *self.inner.get() };
+        let mut inner = self.inner.borrow_mut();
         let id = inner.len();
         inner.push(BufferStatus::new(buffer_rows, id));
         BufferStatusId { id }
@@ -168,18 +168,18 @@ impl SharedBufferStatus {
     /// # Safety:
     /// - the id must be valid
     #[must_use]
-    pub unsafe fn can_receive(&self, comp_id: &BufferStatusId, new_row: usize) -> bool {
-        let inner = &mut *self.inner.get();
-        inner.get_unchecked(comp_id.id).can_receive(new_row)
+    pub fn can_receive(&self, comp_id: &BufferStatusId, new_row: usize) -> bool {
+        let inner = self.inner.borrow();
+        inner.get(comp_id.id).unwrap().can_receive(new_row)
     }
     /// # Safety:
     /// - the id must be valid
     /// # Returns:
     /// if a ready line is received, return true, else return false
     #[must_use]
-    pub unsafe fn receive(&self, comp_id: &BufferStatusId, new_row: usize, sub_id: usize) -> bool {
-        let inner = &mut *self.inner.get();
-        let buffer = inner.get_unchecked_mut(comp_id.id);
+    pub fn receive(&self, comp_id: &BufferStatusId, new_row: usize, sub_id: usize) -> bool {
+        let mut inner = self.inner.borrow_mut();
+        let buffer = inner.get_mut(comp_id.id).unwrap();
         buffer.receive(new_row, sub_id)
     }
     /// # Safety:
@@ -191,9 +191,9 @@ impl SharedBufferStatus {
     // }
     /// # Safety:
     /// - the id must be valid
-    pub unsafe fn add_waiting(&self, comp_id: &BufferStatusId, row: usize, sub_id: usize) {
-        let inner = &mut *self.inner.get();
-        let buffer = inner.get_unchecked_mut(comp_id.id);
+    pub fn add_waiting(&self, comp_id: &BufferStatusId, row: usize, sub_id: usize) {
+        let mut inner = self.inner.borrow_mut();
+        let buffer = inner.get_mut(comp_id.id).unwrap();
         buffer.add_waiting(row, sub_id);
     }
 
@@ -201,10 +201,16 @@ impl SharedBufferStatus {
     /// - the id must be valid
     ///
     /// see the comment of `BufferStatus::remove()`
-    pub unsafe fn remove(&self, comp_id: &BufferStatusId, row: usize) {
-        let inner = &mut *self.inner.get();
-        let buffer = inner.get_unchecked_mut(comp_id.id);
+    pub fn remove(&self, comp_id: &BufferStatusId, row: usize) {
+        let mut inner = self.inner.borrow_mut();
+        let buffer = inner.get_mut(comp_id.id).unwrap();
         buffer.remove(row);
+    }
+
+    ///
+    pub fn get_current_status(&self, comp_id: &BufferStatusId) -> String {
+        let inner = self.inner.borrow();
+        format!("{:?}", inner.get(comp_id.id).unwrap())
     }
 }
 
@@ -216,74 +222,70 @@ mod test {
     fn main_test() {
         let shared_buffer_status = SharedBufferStatus::default();
         let id = shared_buffer_status.add_component(4);
-        unsafe {
-            //send task
-            shared_buffer_status.add_waiting(&id, 0, 0);
-            shared_buffer_status.add_waiting(&id, 0, 1);
-            shared_buffer_status.add_waiting(&id, 1, 2);
-            println!("{:?}", shared_buffer_status);
-            // start to receive data
-            assert!(shared_buffer_status.can_receive(&id, 0));
-            let is_finished = shared_buffer_status.receive(&id, 0, 0);
-            println!("{:?}", shared_buffer_status);
+        //send task
+        shared_buffer_status.add_waiting(&id, 0, 0);
+        shared_buffer_status.add_waiting(&id, 0, 1);
+        shared_buffer_status.add_waiting(&id, 1, 2);
+        println!("{:?}", shared_buffer_status);
+        // start to receive data
+        assert!(shared_buffer_status.can_receive(&id, 0));
+        let is_finished = shared_buffer_status.receive(&id, 0, 0);
+        println!("{:?}", shared_buffer_status);
 
-            assert!(!is_finished);
-            assert!(shared_buffer_status.can_receive(&id, 0));
-            let is_finished = shared_buffer_status.receive(&id, 0, 1);
-            println!("{:?}", shared_buffer_status);
-            assert!(is_finished);
+        assert!(!is_finished);
+        assert!(shared_buffer_status.can_receive(&id, 0));
+        let is_finished = shared_buffer_status.receive(&id, 0, 1);
+        println!("{:?}", shared_buffer_status);
+        assert!(is_finished);
 
-            let is_finished = shared_buffer_status.receive(&id, 1, 2);
-            println!("{:?}", shared_buffer_status);
-            assert!(is_finished);
-            shared_buffer_status.remove(&id, 0);
-            println!("{:?}", shared_buffer_status);
-            shared_buffer_status.remove(&id, 1);
-            println!("{:?}", shared_buffer_status);
-        }
+        let is_finished = shared_buffer_status.receive(&id, 1, 2);
+        println!("{:?}", shared_buffer_status);
+        assert!(is_finished);
+        shared_buffer_status.remove(&id, 0);
+        println!("{:?}", shared_buffer_status);
+        shared_buffer_status.remove(&id, 1);
+        println!("{:?}", shared_buffer_status);
     }
 
     #[test]
     fn cannot_add_test() {
         let shared_buffer_status = SharedBufferStatus::default();
         let id = shared_buffer_status.add_component(4);
-        unsafe {
-            //send task
-            shared_buffer_status.add_waiting(&id, 0, 0);
-            shared_buffer_status.add_waiting(&id, 0, 1);
-            shared_buffer_status.add_waiting(&id, 1, 2);
-            shared_buffer_status.add_waiting(&id, 2, 2);
-            shared_buffer_status.add_waiting(&id, 3, 2);
-            shared_buffer_status.add_waiting(&id, 4, 2);
+        //send task
+        shared_buffer_status.add_waiting(&id, 0, 0);
+        shared_buffer_status.add_waiting(&id, 0, 1);
+        shared_buffer_status.add_waiting(&id, 1, 2);
+        shared_buffer_status.add_waiting(&id, 2, 2);
+        shared_buffer_status.add_waiting(&id, 3, 2);
+        shared_buffer_status.add_waiting(&id, 4, 2);
 
-            assert!(shared_buffer_status.can_receive(&id, 0));
+        assert!(shared_buffer_status.can_receive(&id, 0));
 
-            // can receive 1,2,3 because 2 more entry is available
-            let _finished = shared_buffer_status.receive(&id, 1, 2);
-            let _finished = shared_buffer_status.receive(&id, 2, 2);
-            let _finished = shared_buffer_status.receive(&id, 3, 2);
+        // can receive 1,2,3 because 2 more entry is available
+        let _finished = shared_buffer_status.receive(&id, 1, 2);
+        let _finished = shared_buffer_status.receive(&id, 2, 2);
+        let _finished = shared_buffer_status.receive(&id, 3, 2);
 
-            // cannot receive 4, because 1 entry is available
-            assert!(!shared_buffer_status.can_receive(&id, 4));
-            // can receive 0, because it's the first one to wait
+        // cannot receive 4, because 1 entry is available
+        assert!(!shared_buffer_status.can_receive(&id, 4));
+        // can receive 0, because it's the first one to wait
 
-            println!(
-                "after add 1,2,3,4 and receive 1,2,3:\n{:?}",
-                shared_buffer_status
-            );
-            assert!(shared_buffer_status.can_receive(&id, 0));
-            let _finished = shared_buffer_status.receive(&id, 0, 0);
-            let _finished = shared_buffer_status.receive(&id, 0, 1);
-            println!("after receive 0:\n{:?}", shared_buffer_status);
-            shared_buffer_status.remove(&id, 0);
-            assert!(shared_buffer_status.can_receive(&id, 4));
-            let _finished = shared_buffer_status.receive(&id, 4, 2);
-            println!("after remove 0 and receive 4\n{:?}", shared_buffer_status);
-            shared_buffer_status.remove(&id, 4);
-            shared_buffer_status.remove(&id, 3);
-            shared_buffer_status.remove(&id, 2);
-            shared_buffer_status.remove(&id, 1);
-            println!("after remove 1,2,3,4\n {:?}", shared_buffer_status);
-        }
+        println!(
+            "after add 1,2,3,4 and receive 1,2,3:\n{:?}",
+            shared_buffer_status
+        );
+        assert!(shared_buffer_status.can_receive(&id, 0));
+        let _finished = shared_buffer_status.receive(&id, 0, 0);
+        let _finished = shared_buffer_status.receive(&id, 0, 1);
+        println!("after receive 0:\n{:?}", shared_buffer_status);
+        shared_buffer_status.remove(&id, 0);
+        assert!(shared_buffer_status.can_receive(&id, 4));
+        let _finished = shared_buffer_status.receive(&id, 4, 2);
+        println!("after remove 0 and receive 4\n{:?}", shared_buffer_status);
+        shared_buffer_status.remove(&id, 4);
+        shared_buffer_status.remove(&id, 3);
+        shared_buffer_status.remove(&id, 2);
+        shared_buffer_status.remove(&id, 1);
+        println!("after remove 1,2,3,4\n {:?}", shared_buffer_status);
     }
 }

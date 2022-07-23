@@ -1,9 +1,6 @@
 appenders:
     stdout:
         kind: console
-        encoder:
-            pattern: "{d(%+)(utc)} [{f}:{L}] {h({l})} {M}:{m}{n}"
-
     file:
       kind: file
       path: log/spmm_log_debug.log
@@ -12,8 +9,6 @@ appenders:
         kind: rolling_file
         path: log/spmm_rolling_debug.log
         append: true
-        encoder:
-          pattern: "{d(%+)(utc)} [{f}:{L}] {h({l})} {M}:{m}{n}"
         policy:
           kind: compound
           trigger:
