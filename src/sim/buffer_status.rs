@@ -64,16 +64,30 @@ impl BufferStatus {
     }
     /// test if the buffer will be availiable to receive a new line
     pub fn can_receive(&self, new_row: usize) -> bool {
-        // already in it, receive it!
-        if self.occupied_rows.contains(&new_row) || self.occupied_rows.len() <= self.total_rows - 2
-        // alwasy receive when it's already in the buffer
-        {
-            true
-        } else if self.occupied_rows.len() == self.total_rows - 1 {
-            // have only one slot, if it's the latest line, receive it
-            self.waiting_sequence.front().unwrap() == &new_row
-        } else {
-            false
+        let remaining = self.total_rows - self.occupied_rows.len();
+        if self.occupied_rows.contains(&new_row) {
+            return true;
+        }
+        // do not contains this one
+        match remaining {
+            0 => false,
+            1 => {
+                if self.waiting_sequence.front().unwrap() == &new_row {
+                    true
+                } else {
+                    if self
+                        .occupied_rows
+                        .contains(self.waiting_sequence.front().unwrap())
+                    {
+                        // the first line is already in the buffer, so the next we can receive!
+                        true
+                    } else {
+                        // the last line should be reserved for the latest one!
+                        false
+                    }
+                }
+            }
+            _ => true,
         }
     }
 

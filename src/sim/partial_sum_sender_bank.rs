@@ -5,57 +5,42 @@
 
 use log::debug;
 
-use crate::sim::SpmmStatusEnum;
-
 use super::{
-    component::Component, merger_status::MergerStatusId, sim_time::NamedTimeId, LevelId,
-    PartialResultTaskType, PartialSignal, SpmmContex, SpmmStatus, StateWithSharedStatus,
+    component::Component, sim_time::NamedTimeId, LevelId, PartialResultTaskType, PartialSignal,
+    SpmmContex, SpmmStatus, StateWithSharedStatus,
 };
 use genawaiter::rc::{Co, Gen};
 
 /// the component that collect the partial sum returned by each worker and ready to send the signle to upper and send the real partial sum to partial sum collector.
 #[derive(Debug)]
-pub struct PartialSumSender {
-    pub level_id: LevelId,
-    pub queue_id_partial_sum_in: usize,
-    pub queue_id_partial_sum_out: usize,
-    pub queue_id_signal_out: usize,
-    pub queue_id_finished_signal_out: usize,
-    pub named_sim_time: NamedTimeId,
-    pub merger_status_id: MergerStatusId,
-    pub is_binding: bool,
-    pub id: usize,
+pub struct PartialSumSenderBank {
+    pub(crate) level_id: LevelId,
+    pub(crate) queue_id_partial_sum_in: usize,
+    pub(crate) queue_id_partial_sum_out: usize,
+    pub(crate) queue_id_signal_out: usize,
+
+    pub(crate) named_sim_time: NamedTimeId,
 }
 
-impl PartialSumSender {
+impl PartialSumSenderBank {
     pub fn new(
         queue_id_partial_sum_in: usize,
         queue_id_partial_sum_out: usize,
-
         queue_id_signal_out: usize,
-        queue_id_finished_signal_out: usize,
         level_id: LevelId,
         named_sim_time: NamedTimeId,
-        merger_status_id: MergerStatusId,
-        is_binding: bool,
-        id: usize,
-    ) -> PartialSumSender {
-        PartialSumSender {
+    ) -> PartialSumSenderBank {
+        PartialSumSenderBank {
             queue_id_partial_sum_in,
             queue_id_partial_sum_out,
             queue_id_signal_out,
-            queue_id_finished_signal_out,
             level_id,
             named_sim_time,
-            merger_status_id,
-            is_binding,
-
-            id,
         }
     }
 }
 
-impl Component for PartialSumSender {
+impl Component for PartialSumSenderBank {
     fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // this is used for record the current time before each yield
@@ -82,8 +67,8 @@ impl Component for PartialSumSender {
                 let (_resouce_id, partial_task): (usize, PartialResultTaskType) =
                     status.into_push_partial_task().unwrap();
                 debug!(
-                    "PartialSumSender-{:?}-{}: receive partial sum: target_id: {}, sender_id: {}",
-                    self.level_id, self.id, partial_task.0, partial_task.1
+                    "PartialSumSenderBank-{:?}: receive partial sum: target_id: {}, sender_id: {}",
+                    self.level_id, partial_task.0, partial_task.1
                 );
 
                 let target_id = partial_task.0;
@@ -102,8 +87,8 @@ impl Component for PartialSumSender {
                     )
                     .await;
                 debug!(
-                    "PartialSumSender-{:?}-{}: send signal to:{:?}",
-                    self.level_id, self.id, self.queue_id_signal_out
+                    "PartialSumSenderBank-{:?}: send signal to:{:?}",
+                    self.level_id, self.queue_id_signal_out
                 );
                 let (time, status) = context.into_inner();
                 let _gap = time - current_time;
@@ -118,8 +103,8 @@ impl Component for PartialSumSender {
                     _gap,
                 );
                 debug!(
-                    "PartialSumSender-{:?}-{}: ready to provide data at queue id: {} data:{:?}",
-                    self.level_id, self.id, self.queue_id_partial_sum_out, partial_task
+                    "PartialSumSenderBank-{:?}: ready to provide data at queue id: {} data:{:?}",
+                    self.level_id, self.queue_id_partial_sum_out, partial_task
                 );
                 // then send the real partial sum out
                 let context: SpmmContex = co
@@ -131,16 +116,10 @@ impl Component for PartialSumSender {
                     ))
                     .await;
                 debug!(
-                    "PartialSumSender-{:?}-{}: target_id: {}, send data to id: {:?} and release the merger",
-                    self.level_id, self.id, target_id, self.queue_id_partial_sum_out
+                    "PartialSumSenderBank-{:?}: send data to id: {:?}",
+                    self.level_id, self.queue_id_partial_sum_out
                 );
-                shared_status.shared_merger_status.release_merger(
-                    self.merger_status_id,
-                    self.id,
-                    target_id,
-                    self.is_binding,
-                );
-                //
+
                 let (time, _status) = context.into_inner();
                 let _gap = time - current_time;
                 current_time = time;
@@ -148,21 +127,6 @@ impl Component for PartialSumSender {
                     &self.named_sim_time,
                     "send_partial_sum",
                     _gap,
-                );
-                // now need to send a signal to the dispatcher that a merger is empty!
-                // send signal to the dispatcher that it's free now!
-                let context = co
-                    .yield_(original_status.clone_with_state(
-                        SpmmStatusEnum::PushMergerFinishedSignal(self.queue_id_finished_signal_out),
-                    ))
-                    .await;
-                let (_time, _status) = context.into_inner();
-                let gap = _time - current_time;
-                current_time = _time;
-                shared_status.shared_named_time.add_idle_time(
-                    &self.named_sim_time,
-                    "send_merger_finished_signal",
-                    gap,
                 );
             }
         };

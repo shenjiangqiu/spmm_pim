@@ -16,7 +16,7 @@ fn test() -> Result<()> {
     let config = serde_yaml::from_str(config_str).unwrap();
     log4rs::init_raw_config(config).unwrap();
 
-    let config_files: Vec<PathBuf> = vec!["configs/large.toml".into(), "configs/ddr4.toml".into()];
+    let config_files: Vec<PathBuf> = vec!["configs/debug.toml".into(), "configs/ddr4.toml".into()];
     let settings = Settings::new(&config_files)?;
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files;

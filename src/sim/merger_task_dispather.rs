@@ -1,3 +1,7 @@
+use std::{cmp::Reverse, collections::BinaryHeap};
+
+use crate::csv_nodata::CsVecNodata;
+
 use super::{
     component::Component, merger_status::MergerStatusId, LevelId, SpmmContex, SpmmStatus,
     SpmmStatusEnum, StateWithSharedStatus,
@@ -15,13 +19,30 @@ pub struct MergerWorkerDispatcher {
 
     // the merger status id
     pub merger_status_id: MergerStatusId,
+    pub is_binding: bool,
+}
+#[derive(PartialEq, Eq)]
+struct TempFullResult {
+    pub target_row: usize,
+    pub target_result: Vec<CsVecNodata<usize>>,
+}
+
+impl Ord for TempFullResult {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.target_row.cmp(&other.target_row)
+    }
+}
+impl PartialOrd for TempFullResult {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Component for MergerWorkerDispatcher {
     fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
         let process = |co: Co<SpmmStatus, SpmmContex>| async move {
             // first get the task
-
+            let mut waiting_tasks = BinaryHeap::new();
             loop {
                 let task: SpmmContex = co
                     .yield_(original_status.clone_with_state(SpmmStatusEnum::Pop(self.full_sum_in)))
@@ -31,31 +52,97 @@ impl Component for MergerWorkerDispatcher {
                     status,
                     shared_status,
                 } = ret_status.into_inner();
-                let (target_row, target_result) = status.into_push_full_partial_task().unwrap().1;
-                debug!(
-                    "MergerWorkerDispatcher-{:?}: receive full sum:{:?} from queue: {}",
-                    self.level_id, target_result, self.full_sum_in
-                );
-                let target_pe = shared_status
-                    .shared_merger_status
-                    .get_next_merger(self.merger_status_id);
-                // find a empty merger!
-                // push the partial result back
-                debug!(
-                    "MergerWorkerDispatcher-{:?}: try to send to {},full sum:{:?} to merger worker:{:?},real_id:{:?}",
-                    self.level_id,self.merger_task_sender[target_pe], target_result, target_pe,self.merger_task_sender[target_pe]
-                );
-                co.yield_(
-                    original_status.clone_with_state(SpmmStatusEnum::PushFullPartialTask(
-                        self.merger_task_sender[target_pe],
-                        (target_row, target_result),
-                    )),
-                )
-                .await;
-                debug!(
-                    "MergerWorkerDispatcher-{:?}: succ to send to {}, to merger worker:{:?},real_id:{:?}",
-                    self.level_id,self.merger_task_sender[target_pe], target_pe,self.merger_task_sender[target_pe]
-                );
+                match status {
+                    SpmmStatusEnum::PushFullPartialTask(_, _) => {
+                        let (target_row, target_result) =
+                            status.into_push_full_partial_task().unwrap().1;
+                        debug!(
+                            "MergerWorkerDispatcher-{:?}:target_id: {}, from queue: {}",
+                            self.level_id, target_row, self.full_sum_in
+                        );
+                        if let Some(target_pe) = shared_status.shared_merger_status.get_next_merger(
+                            self.merger_status_id,
+                            target_row,
+                            self.is_binding,
+                        ) {
+                            // find a empty merger!
+                            // push the partial result back
+                            debug!(
+                            "MergerWorkerDispatcher-{:?}: target_id: {target_row} try to send to {},full sum:{:?} to merger worker:{:?},real_id:{:?}",
+                            self.level_id,self.merger_task_sender[target_pe], target_result, target_pe,self.merger_task_sender[target_pe]
+                            );
+                            co.yield_(original_status.clone_with_state(
+                                SpmmStatusEnum::PushFullPartialTask(
+                                    self.merger_task_sender[target_pe],
+                                    (target_row, target_result),
+                                ),
+                            ))
+                            .await;
+                            debug!(
+                            "MergerWorkerDispatcher-{:?}: target_id: {target_row} succ to send to {}, to merger worker:{:?},real_id:{:?}",
+                            self.level_id,self.merger_task_sender[target_pe], target_pe,self.merger_task_sender[target_pe]
+                            );
+                        } else {
+                            debug!(
+                                "MergerWorkerDispatcher-{:?}: target_id: {} failed to find a empty merger",
+                                self.level_id,target_row,
+                            );
+                            waiting_tasks.push(Reverse(TempFullResult {
+                                target_row,
+                                target_result,
+                            }));
+                        }
+                    }
+                    SpmmStatusEnum::PushMergerFinishedSignal(_) => {
+                        debug!(
+                            "MergerWorkerDispatcher-{:?}: some_merger_finished",
+                            self.level_id,
+                        );
+                        // some entry is freed, try to push to merger again:
+                        for Reverse(TempFullResult {
+                            target_row,
+                            target_result,
+                        }) in waiting_tasks.pop()
+                        {
+                            debug!(
+                                "MergerWorkerDispatcher-{:?}: start to test target_id: {target_row}",
+                                self.level_id,
+                            );
+                            if let Some(target_pe) = shared_status
+                                .shared_merger_status
+                                .get_next_merger(self.merger_status_id, target_row, self.is_binding)
+                            {
+                                // push to that merger
+                                // find a empty merger!
+                                // push the partial result back
+                                debug!("MergerWorkerDispatcher-{:?}: try to send to {},full sum:{:?} to merger worker:{:?},real_id:{:?}",self.level_id,self.merger_task_sender[target_pe], target_result, target_pe,self.merger_task_sender[target_pe]);
+
+                                co.yield_(original_status.clone_with_state(
+                                    SpmmStatusEnum::PushFullPartialTask(
+                                        self.merger_task_sender[target_pe],
+                                        (target_row, target_result),
+                                    ),
+                                ))
+                                .await;
+
+                                debug!("MergerWorkerDispatcher-{:?}: succ to send to {}, to merger worker:{:?},real_id:{:?}",self.level_id,self.merger_task_sender[target_pe], target_pe,self.merger_task_sender[target_pe]);
+                            } else {
+                                debug!(
+                                    "MergerWorkerDispatcher-{:?}: target_id: {} failed to find a empty merger",
+                                    self.level_id,target_row,
+                                );
+                                waiting_tasks.push(Reverse(TempFullResult {
+                                    target_row,
+                                    target_result,
+                                }));
+                                break;
+                            }
+                        }
+                    }
+                    _ => {
+                        unreachable!("cannot be here");
+                    }
+                }
             }
         };
 

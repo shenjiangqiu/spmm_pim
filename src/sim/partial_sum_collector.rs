@@ -26,10 +26,13 @@ pub struct PartialSumCollector {
     // to record how many partial sum have been collected(hint: the old merger_worker will do this!)
     pub buffer_status_id: BufferStatusId,
     pub named_sim_time: NamedTimeId,
+    pub is_bind: bool,
 }
 
 impl Component for PartialSumCollector {
     fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+        // the data collector should should delete the buffer when the standalone mode is applied.Do not delete the buffer when the bind mode is applied.
+        // because in bind mode, the merger worker will delete the buffer
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // need a struct to store current partial sum
             let mut current_partial_sum = BTreeMap::<usize, Vec<CsVecNodata<usize>>>::new();
@@ -63,7 +66,7 @@ impl Component for PartialSumCollector {
                 let (ready_queue_id, target_row, is_last) =
                     status.into_push_ready_queue_id().unwrap().1;
                 debug!(
-                    "PartialSumCollector-{:?}: receive ready queue id: {:?}",
+                    "PartialSumCollector-{:?}: receive ready queue id target: {target_row} queue_id: {:?}",
                     self.level_id, ready_queue_id
                 );
                 debug!(
@@ -93,7 +96,7 @@ impl Component for PartialSumCollector {
                     status.into_push_partial_task().unwrap().1;
                 assert_eq!(target_row, target_row2,"the signal queue target id is not equal to the data id the queue_id is:{ready_queue_id}, check is the queue is poped by other first??");
                 debug!(
-                    "PartialSumCollector-{:?}: receive partial from sum id: {:?}",
+                    "PartialSumCollector-{:?}: receive partial :{target_row2} last:{is_last} from sum id: {:?}",
                     self.level_id, ready_queue_id
                 );
                 current_partial_sum
@@ -122,11 +125,13 @@ impl Component for PartialSumCollector {
                     let (time, _status) = context.into_inner();
                     let gap = time - current_time;
                     current_time = time;
+                    if !self.is_bind {
+                        // it's not bind mode, so the merger worker will not delete the buffer, so we should delete the buffer here
+                        shared_status
+                            .shared_buffer_status
+                            .remove(&self.buffer_status_id, target_row);
+                    }
 
-                    // fix bug here!
-                    shared_status
-                        .shared_buffer_status
-                        .remove(&self.buffer_status_id, target_row);
                     shared_status.shared_named_time.add_idle_time(
                         &self.named_sim_time,
                         "push_full_partial_task",

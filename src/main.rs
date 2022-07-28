@@ -8,7 +8,7 @@ use eyre::{Context, Result};
 use itertools::Itertools;
 use log::{debug, error, info};
 
-use spmm_pim::sim::AllTimeStats;
+use spmm_pim::sim::{AllTimeStats, MEM_ST};
 use spmm_pim::{
     args::{Args, RunMode},
     result::{self, Results},
@@ -56,6 +56,7 @@ fn _main(args: Args) -> Result<()> {
     println!("config");
 
     let settings = Settings::new(&config_files).wrap_err("fail to create Setting object")?;
+    MEM_ST.set(settings.mem_settings.clone()).unwrap();
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files.clone();
     let run_mode = args.run_mode.unwrap_or(RunMode::Sim);
@@ -154,7 +155,7 @@ mod test_main {
             "spmm_pim",
             "-r",
             "sim",
-            "configs/large.toml",
+            "configs/debug.toml",
             "configs/ddr4.toml",
         ];
         let args = Args::parse_from(args);

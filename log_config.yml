@@ -31,3 +31,16 @@ root:
         - rolling_file
         - stdout
         - file
+loggers:
+  spmm_pim::sim:
+    level: info
+  # spmm_pim::sim::partial_sum_collector:
+  #   level: debug
+  # spmm_pim::sim::partial_sum_sender:
+  #   level: debug
+  # spmm_pim::sim::partial_sum_signal_collector:
+  #   level: debug
+  # spmm_pim::sim::merger_task_dispather:
+  #   level: debug
+  # spmm_pim::sim::full_result_merger_worker:
+  #   level: debug

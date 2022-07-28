@@ -2,11 +2,11 @@
 //!
 //!
 
-use std::collections::VecDeque;
+use std::{cmp::Reverse, collections::BinaryHeap};
 
 use super::{
     buffer_status::BufferStatusId, component::Component, sim_time::NamedTimeId, LevelId,
-    SpmmContex, SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
+    PartialSignal, SpmmContex, SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
 };
 use genawaiter::rc::{Co, Gen};
 use log::debug;
@@ -27,7 +27,7 @@ impl Component for PartialSumSignalCollector {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let mut current_time = 0.;
             // currently cannot receive the data, store the signal
-            let mut temp_signal_queue: VecDeque<_> = Default::default();
+            let mut temp_signal_queue: BinaryHeap<Reverse<PartialSignal>> = Default::default();
 
             loop {
                 // first get the signal
@@ -67,7 +67,7 @@ impl Component for PartialSumSignalCollector {
                                 signal.self_sender_id,
                             );
                             debug!(
-                                "PartialSumSignalCollector-{:?}:,target_id:{},finished:{}, receive PushSignal:{:?}",
+                                "PartialSumSignalCollector-{:?}:,target_id: {},finished:{}, receive PushSignal:{:?}",
                                 self.level_id,signal.target_id,finished, signal
                             );
                             debug!(
@@ -109,7 +109,7 @@ impl Component for PartialSumSignalCollector {
                                     .shared_buffer_status
                                     .get_current_status(&self.buffer_status_id)
                             );
-                            temp_signal_queue.push_back(signal);
+                            temp_signal_queue.push(Reverse(signal));
                         }
                     }
                     SpmmStatusEnum::PushBufferPopSignal(_rid) => {
@@ -119,7 +119,7 @@ impl Component for PartialSumSignalCollector {
                         );
                         // a buffer entry is popped, resume the signal
 
-                        while let Some(signal) = temp_signal_queue.pop_front() {
+                        while let Some(Reverse(signal)) = temp_signal_queue.pop() {
                             if shared_status
                                 .shared_buffer_status
                                 .can_receive(&self.buffer_status_id, signal.target_id)
@@ -162,7 +162,13 @@ impl Component for PartialSumSignalCollector {
                             } else {
                                 // cannot receive now, store it and resume it later
                                 debug!("PartialSumSignalCollector-{:?}: invoke PushSignal:{:?} but cannot send now",self.level_id, signal);
-                                temp_signal_queue.push_front(signal);
+                                debug!(
+                                    "the reason cannot receive:{:?}",
+                                    shared_status
+                                        .shared_buffer_status
+                                        .get_current_status(&self.buffer_status_id)
+                                );
+                                temp_signal_queue.push(Reverse(signal));
                                 break;
                             }
                         }

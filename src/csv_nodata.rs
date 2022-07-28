@@ -6,13 +6,24 @@ use std::{
 
 use sprs::{CsVecI, SpIndex};
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(PartialEq, Eq, Clone, Default)]
 pub struct CsVecNodata<I>
 where
     I: SpIndex,
 {
     pub dim: usize,
     pub indices: Vec<I>,
+}
+impl<I> Debug for CsVecNodata<I>
+where
+    I: SpIndex,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CsVecNodata")
+            .field("dim", &self.dim)
+            .field("indices_len", &self.indices.len())
+            .finish()
+    }
 }
 
 impl<I> Deref for CsVecNodata<I>

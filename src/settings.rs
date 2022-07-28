@@ -1,4 +1,5 @@
 use config::File;
+use enum_as_inner::EnumAsInner;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -18,8 +19,17 @@ impl Default for RowMapping {
         RowMapping::Chunk
     }
 }
-#[derive(Deserialize, Debug, Default)]
+
+#[derive(Debug, Deserialize, Clone, Default, EnumAsInner)]
+pub enum BufferMode {
+    #[default]
+    BindMerger,
+    Standalone,
+}
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct MemSettings {
+    pub buffer_mode: BufferMode,
+
     pub row_size: usize,
     pub banks: usize,
     pub chips: usize,

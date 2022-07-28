@@ -22,7 +22,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     run::run_exp_csr,
-    settings::{MemSettings, RowMapping},
+    settings::{BufferMode, MemSettings, RowMapping},
 };
 #[derive(Serialize)]
 struct CombinedResult<'a> {
@@ -70,6 +70,7 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         dimm_buffer_lines: 8,
         channel_buffer_lines: 8,
         chip_buffer_lines: 8,
+        buffer_mode: BufferMode::BindMerger,
     };
     let csr: CsMat<_> = tri.to_csr();
 
