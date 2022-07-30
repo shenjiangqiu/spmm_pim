@@ -67,6 +67,7 @@ pub struct MemSettings {
 
     // the store buffer size
     pub store_size: usize,
+    pub sender_store_size: usize,
 
     // buffer lines
     pub dimm_buffer_lines: usize,

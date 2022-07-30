@@ -1,15 +1,18 @@
 use std::fmt::Debug;
 
-use crate::{csv_nodata::CsVecNodata, settings::RowMapping};
-use genawaiter::{rc::gen, yield_};
+use crate::{csv_nodata::CsVecNodata, settings::RowMapping, sim::StateWithSharedStatus};
+use genawaiter::{
+    rc::{gen, Co, Gen},
+    yield_,
+};
 use itertools::Itertools;
 use log::debug;
 use qsim::ResourceId;
 use sprs::CsMat;
 
 use super::{
-    component::Component, id_translation::get_bank_id_from_row_id, BankTask, BankTaskEnum,
-    SpmmStatus,
+    component::Component, id_translation::get_bank_id_from_row_id, queue_tracker::QueueTrackerId,
+    BankTask, BankTaskEnum, SpmmContex, SpmmStatus,
 };
 
 pub struct TaskSender {
@@ -22,6 +25,7 @@ pub struct TaskSender {
     chips: usize,
     banks: usize,
     row_mapping: RowMapping,
+    queue_tracker_id_send: QueueTrackerId,
 }
 
 impl Debug for TaskSender {
@@ -36,7 +40,7 @@ impl Debug for TaskSender {
 
 impl Component for TaskSender {
     fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
-        Box::new(gen!({
+        let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let all_send_task = self
                 .matrix_a
                 .outer_iterator()
@@ -65,29 +69,46 @@ impl Component for TaskSender {
                         .into();
                     debug!("SENDER: {}:{}:{:?}", target_idx, source_idx, row);
                     let row_start = self.matrix_b.indptr().outer_inds_sz(source_idx);
-                    yield_!(
-                        original_status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
-                            self.task_sender,
-                            BankTaskEnum::PushBankTask(BankTask {
-                                from: source_idx,
-                                to: target_idx,
-                                row,
-                                bank_id,
-                                row_shift: row_start.start,
-                                row_size: row_start.end - row_start.start,
-                            }),
+                    let context = co
+                        .yield_(original_status.clone_with_state(
+                            super::SpmmStatusEnum::PushBankTask(
+                                self.task_sender,
+                                BankTaskEnum::PushBankTask(BankTask {
+                                    from: source_idx,
+                                    to: target_idx,
+                                    row,
+                                    bank_id,
+                                    row_shift: row_start.start,
+                                    row_size: row_start.end - row_start.start,
+                                }),
+                            ),
                         ))
-                    );
+                        .await;
+                    let (_time, status) = context.into_inner();
+                    let StateWithSharedStatus {
+                        status: _,
+                        shared_status,
+                    } = status.into_inner();
+                    shared_status.queue_tracker.enq(&self.queue_tracker_id_send);
                 }
                 // then send a end signal
-                yield_!(
-                    original_status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
-                        self.task_sender,
-                        BankTaskEnum::EndThisTask,
-                    ))
-                );
+                let context = co
+                    .yield_(
+                        original_status.clone_with_state(super::SpmmStatusEnum::PushBankTask(
+                            self.task_sender,
+                            BankTaskEnum::EndThisTask,
+                        )),
+                    )
+                    .await;
+                let (_time, status) = context.into_inner();
+                let StateWithSharedStatus {
+                    status: _,
+                    shared_status,
+                } = status.into_inner();
+                shared_status.queue_tracker.enq(&self.queue_tracker_id_send);
             }
-        }))
+        };
+        Box::new(Gen::new(function))
     }
 }
 
@@ -100,6 +121,7 @@ impl TaskSender {
         chips: usize,
         banks: usize,
         row_mapping: RowMapping,
+        queue_tracker_id_send: QueueTrackerId,
     ) -> Self {
         Self {
             matrix_a,
@@ -109,6 +131,7 @@ impl TaskSender {
             chips,
             banks,
             row_mapping,
+            queue_tracker_id_send,
         }
     }
 }

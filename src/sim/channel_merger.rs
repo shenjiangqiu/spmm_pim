@@ -8,6 +8,7 @@ use super::{
     buffer_status::BufferStatusId,
     merger_status::MergerStatusId,
     merger_task_sender::*,
+    queue_tracker::QueueTrackerId,
     sim_time::{LevelTimeId, NamedTimeId},
     BankID, LevelId,
 };
@@ -22,6 +23,8 @@ pub struct ChannelMerger {
     pub self_level_time_id: LevelTimeId,
     pub buffer_status_id: BufferStatusId,
     pub sim_time: NamedTimeId,
+    pub queue_tracker_id_recv: QueueTrackerId,
+    pub queue_tracker_id_send: Vec<QueueTrackerId>,
 }
 
 impl ChannelMerger {
@@ -33,6 +36,8 @@ impl ChannelMerger {
         self_level_time_id: LevelTimeId,
         sim_time: NamedTimeId,
         buffer_status_id: BufferStatusId,
+        queue_tracker_id_recv: QueueTrackerId,
+        queue_tracker_id_send: Vec<QueueTrackerId>,
     ) -> Self {
         Self {
             level_id,
@@ -42,28 +47,33 @@ impl ChannelMerger {
             self_level_time_id,
             sim_time,
             buffer_status_id,
+            queue_tracker_id_recv,
+            queue_tracker_id_send,
         }
     }
 }
 
 impl MergerTaskSender for ChannelMerger {
-    fn get_lower_id(&self, bank_id: &BankID) -> usize {
-        self.lower_pes[super::chip_id_from_bank_id(bank_id).1]
+    fn get_lower_id(&self, bank_id: &BankID) -> (usize, usize) {
+        (
+            super::chip_id_from_bank_id(bank_id).1,
+            self.lower_pes[super::chip_id_from_bank_id(bank_id).1],
+        )
+    }
+
+    fn get_lower_pes(&self) -> &[ResourceId] {
+        &self.lower_pes
     }
 
     fn get_task_in(&self) -> ResourceId {
         self.task_in
     }
-
     fn get_merger_resouce_id(&self) -> ResourceId {
         panic!("not implemented");
     }
+
     fn get_merger_status_id(&self) -> &MergerStatusId {
         &self.merger_status_id
-    }
-
-    fn get_lower_pes(&self) -> &[ResourceId] {
-        &self.lower_pes
     }
 
     fn get_time_id(&self) -> &NamedTimeId {
@@ -72,5 +82,13 @@ impl MergerTaskSender for ChannelMerger {
 
     fn get_buffer_id(&self) -> &super::buffer_status::BufferStatusId {
         &self.buffer_status_id
+    }
+
+    fn get_queue_tracker_id_recv(&self) -> &QueueTrackerId {
+        &self.queue_tracker_id_recv
+    }
+
+    fn get_queue_tracker_id_send(&self) -> &[QueueTrackerId] {
+        &self.queue_tracker_id_send
     }
 }

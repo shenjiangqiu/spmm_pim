@@ -8,6 +8,7 @@ use super::{
     buffer_status::BufferStatusId,
     merger_status::MergerStatusId,
     merger_task_sender::*,
+    queue_tracker::QueueTrackerId,
     sim_time::{LevelTimeId, NamedTimeId},
     BankID, LevelId,
 };
@@ -23,6 +24,8 @@ pub struct ChipMerger {
     pub buffer_status_id: BufferStatusId,
 
     pub time_id: NamedTimeId,
+    pub queue_tracker_id_recv: QueueTrackerId,
+    pub queue_tracker_id_send: Vec<QueueTrackerId>,
 }
 
 impl ChipMerger {
@@ -34,6 +37,8 @@ impl ChipMerger {
         self_level_time_id: LevelTimeId,
         time_id: NamedTimeId,
         buffer_status_id: BufferStatusId,
+        queue_tracker_id_recv: QueueTrackerId,
+        queue_tracker_id_send: Vec<QueueTrackerId>,
     ) -> Self {
         Self {
             level_id,
@@ -43,28 +48,30 @@ impl ChipMerger {
             self_level_time_id,
             time_id,
             buffer_status_id,
+            queue_tracker_id_recv,
+            queue_tracker_id_send,
         }
     }
 }
 
 impl MergerTaskSender for ChipMerger {
-    fn get_lower_id(&self, bank_id: &BankID) -> usize {
-        self.lower_pes[bank_id.1]
+    fn get_lower_id(&self, bank_id: &BankID) -> (usize, usize) {
+        (bank_id.1, self.lower_pes[bank_id.1])
+    }
+
+    fn get_lower_pes(&self) -> &[ResourceId] {
+        &self.lower_pes
     }
 
     fn get_task_in(&self) -> ResourceId {
         self.task_in
     }
-
     fn get_merger_resouce_id(&self) -> ResourceId {
         panic!("not implemented");
     }
+
     fn get_merger_status_id(&self) -> &MergerStatusId {
         &self.merger_status_id
-    }
-
-    fn get_lower_pes(&self) -> &[ResourceId] {
-        &self.lower_pes
     }
 
     fn get_time_id(&self) -> &super::sim_time::NamedTimeId {
@@ -73,6 +80,14 @@ impl MergerTaskSender for ChipMerger {
 
     fn get_buffer_id(&self) -> &BufferStatusId {
         &self.buffer_status_id
+    }
+
+    fn get_queue_tracker_id_recv(&self) -> &QueueTrackerId {
+        &self.queue_tracker_id_recv
+    }
+
+    fn get_queue_tracker_id_send(&self) -> &[QueueTrackerId] {
+        &self.queue_tracker_id_send
     }
 }
 

@@ -7,8 +7,10 @@ use log::debug;
 use qsim::ResourceId;
 
 use super::{
-    component::Component, sim_time::NamedTimeId, BankID, BankTask, LevelId, SpmmContex, SpmmStatus,
-    SpmmStatusEnum,
+    component::Component,
+    queue_tracker::QueueTrackerId,
+    sim_time::{EndTimeId, NamedTimeId},
+    BankID, BankTask, LevelId, SpmmContex, SpmmStatus, SpmmStatusEnum,
 };
 use crate::{
     pim::merge_rows_into_one,
@@ -100,6 +102,7 @@ pub struct BankPe {
     pub task_sender_input_id: ResourceId,
 
     pub named_idle_time_id: NamedTimeId,
+    pub end_time_id: EndTimeId,
 }
 
 impl BankPe {
@@ -112,6 +115,7 @@ impl BankPe {
         adder_size: usize,
         task_sender_input_id: ResourceId,
         named_idle_time_id: NamedTimeId,
+        end_time_id: EndTimeId,
     ) -> Self {
         Self {
             level_id,
@@ -122,6 +126,7 @@ impl BankPe {
             adder_size,
             task_sender_input_id,
             named_idle_time_id,
+            end_time_id,
         }
     }
 }
@@ -156,6 +161,9 @@ impl Component for BankPe {
                     "get_task",
                     gap,
                 );
+                shared_status
+                    .shared_end_time
+                    .set_end_time(self.end_time_id, current_time);
                 match bank_task {
                     BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
                         debug!("BANK_PE: receive task: to: row: {},{:?}", to, row);
@@ -193,6 +201,11 @@ impl Component for BankPe {
                                 self.partial_out,
                                 (current_task, self.task_sender_input_id, &data)
                             );
+
+                            shared_status
+                                .shared_end_time
+                                .set_end_time(self.end_time_id, current_time);
+
                             let context = co
                                 .yield_(status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                                     self.partial_out,
@@ -232,6 +245,8 @@ pub struct BankTaskReorder {
     pub bank_change_latency: f64,
 
     pub comp_id: NamedTimeId,
+    pub end_time_id: EndTimeId,
+    pub queue_tracker_id_recv: QueueTrackerId,
 }
 
 // TODO
@@ -253,6 +268,7 @@ impl Component for BankTaskReorder {
                 let gap = time - current_time;
                 // TODO: add the idle time to the comp_time
                 current_time = time;
+
                 debug!(
                     "TASK_REORDER: time: {},received taske: {:?}",
                     time, pop_status
@@ -267,7 +283,10 @@ impl Component for BankTaskReorder {
                     "get_task_from_chip",
                     gap,
                 );
-
+                shared_status.queue_tracker.deq(&self.queue_tracker_id_recv);
+                shared_status
+                    .shared_end_time
+                    .set_end_time(self.end_time_id, time);
                 let (_resouce_id, task) = status.into_push_bank_task().unwrap();
 
                 match task {
@@ -298,6 +317,9 @@ impl Component for BankTaskReorder {
                                     .await;
                                 let (_time, _status) = context.into_inner();
                                 current_time = _time;
+                                shared_status
+                                    .shared_end_time
+                                    .set_end_time(self.end_time_id, current_time);
                             }
                         } else {
                             for _i in inner_row_id_start..=inner_row_id_end {
@@ -309,6 +331,9 @@ impl Component for BankTaskReorder {
                                     .await;
                                 let (_time, _status) = context.into_inner();
                                 current_time = _time;
+                                shared_status
+                                    .shared_end_time
+                                    .set_end_time(self.end_time_id, current_time);
                             }
                         }
 
@@ -343,6 +368,9 @@ impl Component for BankTaskReorder {
                             "push_bank_task",
                             gap,
                         );
+                        shared_status
+                            .shared_end_time
+                            .set_end_time(self.end_time_id, current_time);
                     }
                     BankTaskEnum::EndThisTask => {
                         // end this task
@@ -363,6 +391,10 @@ impl Component for BankTaskReorder {
                             "push_bank_task",
                             gap,
                         );
+                        shared_status
+                            .shared_end_time
+                            .set_end_time(self.end_time_id, current_time);
+
                         current_target_pe = (current_target_pe + 1) % num_pes;
                     }
                 }
@@ -381,6 +413,8 @@ impl BankTaskReorder {
         self_id: BankID,
         bank_change_latency: f64,
         comp_id: NamedTimeId,
+        end_time_id: EndTimeId,
+        queue_tracker_id_recv: QueueTrackerId,
     ) -> Self {
         Self {
             level_id,
@@ -390,6 +424,8 @@ impl BankTaskReorder {
             self_id,
             bank_change_latency,
             comp_id,
+            end_time_id,
+            queue_tracker_id_recv,
         }
     }
 }
@@ -402,7 +438,9 @@ mod test {
     use crate::{
         settings::RowMapping,
         sim::{
-            final_receiver::FinalReceiver, sim_time::SharedNamedTime, task_sender::TaskSender,
+            final_receiver::FinalReceiver,
+            sim_time::{SharedEndTime, SharedNamedTime},
+            task_sender::TaskSender,
             SharedStatus, SpmmStatus,
         },
     };
@@ -415,6 +453,7 @@ mod test {
         let config = serde_yaml::from_str(config_str).unwrap();
         log4rs::init_raw_config(config).unwrap_or(());
         let shared_named_time: Rc<SharedNamedTime> = Rc::new(Default::default());
+        let shared_end_time: Rc<SharedEndTime> = Rc::new(Default::default());
         let status = SpmmStatus::new(
             SpmmStatusEnum::Continue,
             SharedStatus {
@@ -437,9 +476,20 @@ mod test {
             final_receiver_process,
             status.clone_with_state(SpmmStatusEnum::Continue),
         );
-
-        let task_sender =
-            TaskSender::new(two_mat.a, two_mat.b, task_in, 1, 1, 1, RowMapping::Chunk);
+        let queue_id_send = status
+            .shared_status
+            .queue_tracker
+            .add_component_with_name("123");
+        let task_sender = TaskSender::new(
+            two_mat.a,
+            two_mat.b,
+            task_in,
+            1,
+            1,
+            1,
+            RowMapping::Chunk,
+            queue_id_send,
+        );
 
         let task_pe = {
             let mut task_pe = vec![];
@@ -451,6 +501,8 @@ mod test {
         };
 
         let comp_id = shared_named_time.add_component_with_name("123", vec!["test"]);
+        let end_time_id = shared_end_time.add_component_with_name("123");
+
         let bank_task_reorder = BankTaskReorder::new(
             LevelId::Dimm,
             task_in,
@@ -459,11 +511,14 @@ mod test {
             ((0, 0), 0),
             33.,
             comp_id,
+            end_time_id,
+            queue_id_send,
         );
         let bank_pes = {
             let mut pes = vec![];
             for pe_in in task_pe {
                 let comp_id = shared_named_time.add_component_with_name("123", vec!["test"]);
+                let end_time_id = shared_end_time.add_component_with_name("123");
                 let pe_comp = BankPe::new(
                     LevelId::Bank(Default::default()),
                     0,
@@ -473,6 +528,7 @@ mod test {
                     4,
                     task_in,
                     comp_id,
+                    end_time_id,
                 );
                 pes.push(pe_comp);
             }

@@ -8,12 +8,14 @@ use qsim::{ResourceId, SimContext};
 
 use super::{
     buffer_status::BufferStatusId, component::Component, merger_status::MergerStatusId,
-    sim_time::NamedTimeId, BankID, BankTask, BankTaskEnum, SpmmContex, SpmmStatus, SpmmStatusEnum,
+    queue_tracker::QueueTrackerId, sim_time::NamedTimeId, BankID, BankTask, BankTaskEnum,
+    SpmmContex, SpmmStatus, SpmmStatusEnum,
 };
 
 pub trait MergerTaskSender {
     // lower id should be the resource id that connect to the lower pe
-    fn get_lower_id(&self, bank_id: &BankID) -> usize;
+    /// return (index, resource id)
+    fn get_lower_id(&self, bank_id: &BankID) -> (usize, usize);
     // all resouce ids
     fn get_lower_pes(&self) -> &[ResourceId];
     fn get_task_in(&self) -> ResourceId;
@@ -22,6 +24,8 @@ pub trait MergerTaskSender {
 
     fn get_time_id(&self) -> &NamedTimeId;
     fn get_buffer_id(&self) -> &BufferStatusId;
+    fn get_queue_tracker_id_recv(&self) -> &QueueTrackerId;
+    fn get_queue_tracker_id_send(&self) -> &[QueueTrackerId];
 }
 #[derive(Debug, Clone, Default)]
 pub struct MergerWorkerStatus {
@@ -61,6 +65,7 @@ where
                 let (_time, task) = context.into_inner();
                 let gap = _time - current_time;
                 current_time = _time;
+
                 let StateWithSharedStatus {
                     status,
                     shared_status,
@@ -68,6 +73,15 @@ where
                 shared_status
                     .shared_named_time
                     .add_idle_time(self.get_time_id(), "get_task", gap);
+                shared_status
+                    .queue_tracker
+                    .deq(self.get_queue_tracker_id_recv());
+                if gap > 10. {
+                    log::error!("error! gap is too large: {}", gap);
+
+                    // print current queue length!
+                    shared_status.queue_tracker.show_data();
+                }
                 let task = status.into_push_bank_task().unwrap().1;
 
                 match task {
@@ -80,7 +94,7 @@ where
                         row_size,
                     }) => {
                         // then push to target pe
-                        let lower_pe_id = self.get_lower_id(&bank_id);
+                        let (lower_index, lower_pe_id) = self.get_lower_id(&bank_id);
 
                         // record that the task is on going to lower_pe_id, record it!
                         shared_status.shared_buffer_status.add_waiting(
@@ -111,10 +125,17 @@ where
                                 )),
                             )
                             .await;
+                        shared_status
+                            .queue_tracker
+                            .enq(&self.get_queue_tracker_id_send()[lower_index]);
                         let (_time, _status) = context.into_inner();
+
                         let gap = _time - current_time;
                         current_time = _time;
-
+                        if gap > 10. {
+                            log::error!("error! gap is too large: {}", gap);
+                            // print current queue length!
+                        }
                         shared_status.shared_named_time.add_idle_time(
                             self.get_time_id(),
                             "push_bank_task",
@@ -123,15 +144,20 @@ where
                     }
                     super::BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
-                        for lower_pe_id in self.get_lower_pes().iter().cloned().collect_vec() {
+                        for (lower_pe_id, lower_queue_tracker_id) in self
+                            .get_lower_pes()
+                            .iter()
+                            .zip(self.get_queue_tracker_id_send())
+                        {
                             let context = co
                                 .yield_(original_status.clone_with_state(
                                     SpmmStatusEnum::PushBankTask(
-                                        lower_pe_id,
+                                        *lower_pe_id,
                                         super::BankTaskEnum::EndThisTask,
                                     ),
                                 ))
                                 .await;
+                            shared_status.queue_tracker.enq(lower_queue_tracker_id);
                             let (_time, _status) = context.into_inner();
                             let gap = _time - current_time;
                             current_time = _time;

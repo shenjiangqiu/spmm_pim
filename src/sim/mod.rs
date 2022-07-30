@@ -16,6 +16,7 @@ pub mod partial_sum_sender;
 pub mod partial_sum_sender_bank;
 pub mod partial_sum_sender_dimm;
 pub mod partial_sum_signal_collector;
+pub mod queue_tracker;
 pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
@@ -33,7 +34,13 @@ use qsim::{
 };
 use serde::Serialize;
 use sprs::CsMat;
-use std::{cell::RefCell, collections::BTreeMap, fmt::Debug, path::Path, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    fmt::{format, Debug},
+    path::Path,
+    rc::Rc,
+};
 pub static MEM_ST: OnceCell<MemSettings> = OnceCell::new();
 use self::{
     bank::{BankPe, BankTaskReorder},
@@ -50,7 +57,11 @@ use self::{
     partial_sum_sender_bank::PartialSumSenderBank,
     partial_sum_sender_dimm::PartialSumSenderDimm,
     partial_sum_signal_collector::PartialSumSignalCollector,
-    sim_time::{LevelTime, LevelTimeId, SharedNamedTime, SharedSimTime, TimeStats},
+    queue_tracker::{QueueTracker, QueueTrackerId},
+    sim_time::{
+        DetailedTimeStats, LevelTime, LevelTimeId, SharedEndTime, SharedNamedTime, SharedSimTime,
+        TimeStats,
+    },
     task_sender::TaskSender,
 };
 use crate::{
@@ -144,6 +155,8 @@ pub struct SharedStatus {
     pub shared_named_time: Rc<SharedNamedTime>,
     pub shared_buffer_status: Rc<SharedBufferStatus>,
     pub shared_merger_status: Rc<SharedMergerStatus>,
+    pub shared_end_time: Rc<SharedEndTime>,
+    pub queue_tracker: Rc<QueueTracker>,
 }
 pub struct StateWithSharedStatus {
     pub status: SpmmStatusEnum,
@@ -313,7 +326,6 @@ enum SimulationResult {
 
 fn build_dimm(
     mem_settings: &MemSettings,
-    store_size: usize,
     sim: &mut Simulation<SpmmStatus>,
     task_send_store: usize,
     status: SpmmStatus,
@@ -324,12 +336,19 @@ fn build_dimm(
     bank_level_id: LevelTimeId,
     p_collector: &mut ProcessInfoCollector,
     sender_id_to_name_mapping: &mut BTreeMap<usize, String>,
+    queue_tracker_id_recv: QueueTrackerId,
 ) -> eyre::Result<()> {
     let shared_status = status.shared_status.clone();
     // 2. add the Dimm
     let num_channels = mem_settings.channels;
+    // task send from dimm to channel
     let channel_stores = (0..num_channels)
-        .map(|_i| sim.create_resource(Box::new(Store::new(store_size)), "dimm_to_channel"))
+        .map(|_i| {
+            sim.create_resource(
+                Box::new(Store::new(mem_settings.sender_store_size)),
+                "dimm_to_channel",
+            )
+        })
         .collect_vec();
     for (index, id) in channel_stores.iter().enumerate() {
         sender_id_to_name_mapping.insert(*id, format!("channel_{}", index));
@@ -359,10 +378,8 @@ fn build_dimm(
         named_sim_time,
     };
     p_collector.create_process_and_schedule(sim, dimm_signal_collector, &status);
-    let collector_to_dispatcher = sim.create_resource(
-        Box::new(Store::new(store_size)),
-        "collector_to_dispatcher_dimm",
-    );
+    let collector_to_dispatcher =
+        sim.create_resource(Box::new(Store::new(1)), "collector_to_dispatcher_dimm");
     let named_sim_time = shared_status.shared_named_time.add_component_with_name(
         "DIMM_DATA_COLLECTOR",
         vec!["dimm_data_collector", "data_collector"],
@@ -379,6 +396,13 @@ fn build_dimm(
     };
 
     p_collector.create_process_and_schedule(sim, dimm_partial_sum_data_collector, &status);
+    let queue_tracker_id_send = (0..num_channels)
+        .map(|i| {
+            shared_status
+                .queue_tracker
+                .add_component_with_name(format!("dimm_sender-{i}"))
+        })
+        .collect_vec();
 
     let dimm = DimmMerger::new(
         LevelId::Dimm,
@@ -387,6 +411,8 @@ fn build_dimm(
         merger_status_id,
         sim_time_id,
         buffer_status_id,
+        queue_tracker_id_recv,
+        queue_tracker_id_send.clone(),
     );
 
     p_collector.create_process_and_schedule(sim, dimm, &status);
@@ -411,10 +437,8 @@ fn build_dimm(
         };
         p_collector.create_process_and_schedule(sim, dimm_signal_sender, &status);
 
-        let full_partial_sum_in = sim.create_resource(
-            Box::new(Store::new(store_size)),
-            "dispatcher_to_merger_dimm",
-        );
+        let full_partial_sum_in =
+            sim.create_resource(Box::new(Store::new(1)), "dispatcher_to_merger_dimm");
         let named_sim_time = shared_status.shared_named_time.add_component_with_name(
             "DIMM_MERGER_TASK_WORKER",
             vec!["dimm_merger_task_worker", "merger_task_worker"],
@@ -450,7 +474,6 @@ fn build_dimm(
         mem_settings,
         sim,
         status,
-        store_size,
         channel_level_id,
         chip_level_id,
         bank_level_id,
@@ -458,6 +481,7 @@ fn build_dimm(
         signal_in,
         p_collector,
         sender_id_to_name_mapping,
+        queue_tracker_id_send,
     )?;
     Ok(())
 }
@@ -466,7 +490,6 @@ fn build_channel(
     mem_settings: &MemSettings,
     sim: &mut Simulation<SpmmStatus>,
     status: SpmmStatus,
-    store_size: usize,
     channel_level_id: LevelTimeId,
     chip_level_id: LevelTimeId,
     bank_level_id: LevelTimeId,
@@ -474,17 +497,27 @@ fn build_channel(
     dimm_signal_in: usize,
     p_collector: &mut ProcessInfoCollector,
     sender_id_to_name_mapping: &mut BTreeMap<usize, String>,
+    queue_tracker_id_recv: Vec<QueueTrackerId>,
 ) -> eyre::Result<()> {
     let shared_status = status.shared_status.clone();
 
     // 3. add the Channel
-    for (channel_id, dimm_to_channel_task_sender) in channel_task_senders.into_iter().enumerate() {
+    for (channel_id, (dimm_to_channel_task_sender, queue_tracker_id_recv)) in channel_task_senders
+        .into_iter()
+        .zip(queue_tracker_id_recv)
+        .enumerate()
+    {
         // create the channel!
         let num_chips = mem_settings.chips;
 
         // the channel that send task to the chip from this channel
         let chip_stores = (0..num_chips)
-            .map(|_i| sim.create_resource(Box::new(Store::new(store_size)), "channel_to_chip"))
+            .map(|_i| {
+                sim.create_resource(
+                    Box::new(Store::new(mem_settings.sender_store_size)),
+                    "channel_to_chip",
+                )
+            })
             .collect_vec();
         for (index, id) in chip_stores.iter().enumerate() {
             sender_id_to_name_mapping.insert(*id, format!("chip_{}.{}", channel_id, index));
@@ -534,7 +567,13 @@ fn build_channel(
         };
 
         p_collector.create_process_and_schedule(sim, channel_partial_sum_data_collector, &status);
-
+        let queue_tracker_id_send = (0..num_chips)
+            .map(|i| {
+                shared_status
+                    .queue_tracker
+                    .add_component_with_name(format!("channel_sender-{i}"))
+            })
+            .collect_vec();
         let channel = ChannelMerger::new(
             LevelId::Channel(channel_id),
             dimm_to_channel_task_sender,
@@ -543,6 +582,8 @@ fn build_channel(
             channel_level_id,
             sim_time,
             buffer_status_id,
+            queue_tracker_id_recv,
+            queue_tracker_id_send.clone(),
         );
 
         // create the process
@@ -570,10 +611,8 @@ fn build_channel(
             };
             p_collector.create_process_and_schedule(sim, channel_signal_sender, &status);
 
-            let resouce = sim.create_resource(
-                Box::new(Store::new(store_size)),
-                "dispatcher_to_merger_channel",
-            );
+            let resouce =
+                sim.create_resource(Box::new(Store::new(1)), "dispatcher_to_merger_channel");
             let named_sim_time = shared_status.shared_named_time.add_component_with_name(
                 "channel_merger_task_worker",
                 vec!["merger_task_worker", "channel_merger_task_worker"],
@@ -608,7 +647,6 @@ fn build_channel(
             mem_settings,
             sim,
             status.clone(),
-            store_size,
             chip_level_id,
             bank_level_id,
             chip_stores,
@@ -616,6 +654,7 @@ fn build_channel(
             signal_in,
             p_collector,
             sender_id_to_name_mapping,
+            queue_tracker_id_send,
         )?;
     }
     Ok(())
@@ -624,7 +663,6 @@ fn build_chip(
     mem_settings: &MemSettings,
     sim: &mut Simulation<SpmmStatus>,
     status: SpmmStatus,
-    store_size: usize,
     chip_level_id: LevelTimeId,
     bank_level_id: LevelTimeId,
     chip_stores: Vec<usize>,
@@ -632,15 +670,25 @@ fn build_chip(
     channel_signal_in: usize,
     p_collector: &mut ProcessInfoCollector,
     sender_id_to_name_mapping: &mut BTreeMap<usize, String>,
+    queue_tracker_id_recv: Vec<QueueTrackerId>,
 ) -> eyre::Result<()> {
     let shared_status = status.shared_status.clone();
     // 4. add the chip
-    for (chip_id, store_id) in chip_stores.into_iter().enumerate() {
+    for (chip_id, (store_id, queue_tracker_id_recv)) in chip_stores
+        .into_iter()
+        .zip(queue_tracker_id_recv)
+        .enumerate()
+    {
         // create the chip!
         let chip_id = (channel_id, chip_id);
         let num_banks = mem_settings.banks;
         let bank_stores = (0..num_banks)
-            .map(|_i| sim.create_resource(Box::new(Store::new(store_size)), "chip_to_bank"))
+            .map(|_i| {
+                sim.create_resource(
+                    Box::new(Store::new(mem_settings.sender_store_size)),
+                    "chip_to_bank",
+                )
+            })
             .collect_vec();
         for (index, id) in bank_stores.iter().enumerate() {
             sender_id_to_name_mapping.insert(*id, format!("bank_{:?}.{}", &chip_id, index));
@@ -687,7 +735,13 @@ fn build_chip(
             is_bind: mem_settings.buffer_mode.is_bind_merger(),
         };
         p_collector.create_process_and_schedule(sim, chip_partial_sum_data_collector, &status);
-
+        let queue_tracker_id_send = (0..num_banks)
+            .map(|i| {
+                shared_status
+                    .queue_tracker
+                    .add_component_with_name(format!("chip_sender-{i}"))
+            })
+            .collect_vec();
         let chip = ChipMerger::new(
             LevelId::Chip(chip_id),
             store_id,
@@ -696,6 +750,8 @@ fn build_chip(
             chip_level_id,
             sim_time_id,
             buffer_status_id,
+            queue_tracker_id_recv,
+            queue_tracker_id_send.clone(),
         );
 
         // create the process
@@ -725,10 +781,7 @@ fn build_chip(
             };
             p_collector.create_process_and_schedule(sim, chip_signal_sender, &status);
 
-            let resouce = sim.create_resource(
-                Box::new(Store::new(store_size)),
-                "dispatcher_to_merger_chip",
-            );
+            let resouce = sim.create_resource(Box::new(Store::new(1)), "dispatcher_to_merger_chip");
             let named_sim_time = shared_status.shared_named_time.add_component_with_name(
                 "chip_merger_task_worker",
                 vec!["merger_task_worker", "chip_merger_task_worker"],
@@ -764,13 +817,13 @@ fn build_chip(
             mem_settings,
             sim,
             status.clone(),
-            store_size,
             bank_level_id,
             bank_stores,
             chip_id,
             signal_in,
             p_collector,
             sender_id_to_name_mapping,
+            queue_tracker_id_send,
         )?;
     }
     // start
@@ -783,28 +836,40 @@ fn build_bank(
     mem_settings: &MemSettings,
     sim: &mut Simulation<SpmmStatus>,
     status: SpmmStatus,
-    store_size: usize,
     _bank_level_id: LevelTimeId,
     bank_stores: Vec<usize>,
     chip_id: ChipID,
     chip_signal_in: usize,
     p_collector: &mut ProcessInfoCollector,
     _sender_id_to_name_mapping: &mut BTreeMap<usize, String>,
+    queue_tracker_id_recv: Vec<QueueTrackerId>,
 ) -> eyre::Result<()> {
     let shared_status = status.shared_status.clone();
     // 5. add the bank
-    for (bank_id, store_id) in bank_stores.into_iter().enumerate() {
+    for (bank_id, (store_id, queue_tracker_id_recv)) in bank_stores
+        .into_iter()
+        .zip(queue_tracker_id_recv)
+        .enumerate()
+    {
         // create the bank!
         let bank_id = (chip_id, bank_id);
 
         let bank_pe_stores = (0..mem_settings.bank_merger_count)
-            .map(|_i| sim.create_resource(Box::new(Store::new(store_size)), "bank_to_pe"))
+            .map(|_i| {
+                sim.create_resource(
+                    Box::new(Store::new(mem_settings.sender_store_size)),
+                    "bank_to_pe",
+                )
+            })
             .collect_vec();
 
         let comp_id = shared_status.shared_named_time.add_component_with_name(
             &format!("bank_reorder-{bank_id:?}"),
             vec!["bank_bank_reorder", "bank_reorder"],
         );
+        let end_time_id = shared_status
+            .shared_end_time
+            .add_component_with_name(format!("bank_reorder-{bank_id:?}"));
         let bank = BankTaskReorder::new(
             LevelId::Bank(bank_id),
             store_id,
@@ -813,6 +878,8 @@ fn build_bank(
             bank_id,
             mem_settings.row_change_latency as f64,
             comp_id,
+            end_time_id,
+            queue_tracker_id_recv,
         );
 
         // create the process
@@ -841,7 +908,9 @@ fn build_bank(
                 format!("bank_pe_{bank_id:?}_{bank_pe_id}"),
                 vec!["bank_pe"],
             );
-
+            let end_time_id = shared_status
+                .shared_end_time
+                .add_component_with_name(format!("bank_pe-{bank_id:?}-{bank_pe_id}"));
             let bank_pe = BankPe::new(
                 LevelId::Bank(bank_id),
                 bank_pe_id,
@@ -851,6 +920,7 @@ fn build_bank(
                 mem_settings.bank_adder_size,
                 store_id,
                 comp_id,
+                end_time_id,
             );
             p_collector.create_process_and_schedule(sim, bank_pe, &status);
         }
@@ -868,7 +938,7 @@ impl Simulator {
     pub fn run(
         mem_settings: &MemSettings,
         input_matrix: TwoMatrix<i32, i32>,
-    ) -> Result<TimeStats, eyre::Report> {
+    ) -> Result<(TimeStats, DetailedTimeStats, Vec<(String, f64)>), eyre::Report> {
         let mut sender_id_to_name_mapping = BTreeMap::<usize, String>::new();
 
         let total_rows = input_matrix.a.rows();
@@ -893,6 +963,7 @@ impl Simulator {
         let shared_buffer_status = Rc::new(SharedBufferStatus::default());
         let sim_time = Rc::new(SharedSimTime::new());
         let merger_status = Default::default();
+
         let shared_status = SharedStatus {
             shared_bankpe_status: bankpe_status,
             shared_sim_time: sim_time,
@@ -900,6 +971,7 @@ impl Simulator {
             shared_named_time,
             shared_buffer_status,
             shared_merger_status: merger_status,
+            ..Default::default()
         };
         let status = SpmmStatus::new(SpmmStatusEnum::Continue, shared_status.clone());
 
@@ -918,6 +990,9 @@ impl Simulator {
         let task_send_store =
             sim.create_resource(Box::new(Store::new(store_size)), "task_send_store");
         sender_id_to_name_mapping.insert(task_send_store, "dimm".to_string());
+        let queue_tracker_id_send = shared_status
+            .queue_tracker
+            .add_component_with_name("channel_sender");
         let task_sender = TaskSender::new(
             input_matrix.a,
             input_matrix.b,
@@ -926,12 +1001,12 @@ impl Simulator {
             mem_settings.chips,
             mem_settings.banks,
             mem_settings.row_mapping.clone(),
+            queue_tracker_id_send,
         );
         p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
 
         build_dimm(
             mem_settings,
-            store_size,
             &mut sim,
             task_send_store,
             status.clone(),
@@ -942,6 +1017,7 @@ impl Simulator {
             bank_level_id,
             &mut p_collector,
             &mut sender_id_to_name_mapping,
+            queue_tracker_id_send,
         )?;
         // p_collector.show_data();
 
@@ -971,7 +1047,12 @@ impl Simulator {
             "sender_id_to_name_mapping:\n{}",
             serde_json::to_string_pretty(&sender_id_to_name_mapping).unwrap()
         );
-        Ok(time_stats)
+        let detailed_time_stats = status
+            .shared_status
+            .shared_named_time
+            .get_detailed_stats(time);
+        let end_time_stats = status.shared_status.shared_end_time.get_stats(time);
+        Ok((time_stats, detailed_time_stats, end_time_stats))
     }
 }
 
@@ -1017,6 +1098,7 @@ mod test {
             row_change_latency: 8,
             bank_adder_size: 8,
             store_size: 1,
+            sender_store_size: 4,
             dimm_buffer_lines: 2,
             channel_buffer_lines: 2,
             chip_buffer_lines: 2,

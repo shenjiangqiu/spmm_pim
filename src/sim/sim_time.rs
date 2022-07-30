@@ -9,6 +9,7 @@
 
 use std::{cell::RefCell, collections::BTreeMap};
 
+use itertools::Itertools;
 use log::info;
 use serde::Serialize;
 
@@ -27,6 +28,37 @@ pub struct SharedNamedTime {
     data: RefCell<Vec<(String, Vec<String>, NamedTime)>>,
 }
 
+#[derive(Default, Debug)]
+pub struct SharedEndTime {
+    data: RefCell<Vec<(String, f64)>>,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct EndTimeId {
+    pub id: usize,
+}
+
+impl SharedEndTime {
+    pub fn add_component_with_name(&self, name: impl Into<String>) -> EndTimeId {
+        self.data.borrow_mut().push((name.into(), 0.0));
+        EndTimeId {
+            id: self.data.borrow().len() - 1,
+        }
+    }
+    pub fn set_end_time(&self, id: EndTimeId, time: f64) {
+        self.data.borrow_mut()[id.id].1 = time;
+    }
+    pub fn get_end_time(&self, id: EndTimeId) -> f64 {
+        self.data.borrow()[id.id].1
+    }
+    pub fn get_stats(&self, time: f64) -> Vec<(String, f64)> {
+        self.data
+            .borrow()
+            .iter()
+            .map(|(name, real_time)| (name.clone(), real_time / time))
+            .collect()
+    }
+}
+
 /// the id to identify a component, use this instead of usize to prevent using arbitrary id or id created by other StaticSimTime.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedTimeId {
@@ -36,6 +68,28 @@ pub struct NamedTimeId {
 pub struct TimeStats {
     /// real time, total time
     pub status: BTreeMap<String, (f64, f64)>,
+}
+
+#[derive(Serialize)]
+pub struct DetailedTimeStats {
+    /// real time, total time
+    pub status: BTreeMap<String, Vec<(f64, f64)>>,
+}
+impl DetailedTimeStats {
+    pub fn to_rate(self) -> Vec<(String, Vec<f64>)> {
+        self.status
+            .into_iter()
+            .map(|(name, stats)| {
+                (
+                    name,
+                    stats
+                        .into_iter()
+                        .map(|(real, total)| real / total)
+                        .collect(),
+                )
+            })
+            .collect_vec()
+    }
 }
 
 impl TimeStats {
@@ -119,6 +173,23 @@ impl SharedNamedTime {
                     let mut entry = stats.status.entry(full_name).or_insert((0.0, 0.0));
                     entry.0 += inner_time;
                     entry.1 += sim_time;
+                }
+            }
+        }
+        stats
+    }
+
+    pub fn get_detailed_stats(&self, sim_time: f64) -> DetailedTimeStats {
+        let mut stats = DetailedTimeStats {
+            status: BTreeMap::new(),
+        };
+        let data = self.data.borrow();
+        for (_name, tags, time) in data.iter() {
+            for tag_name in tags {
+                for (inner_name, inner_time) in &time.data {
+                    let full_name = format!("{}:{}", tag_name, inner_name);
+                    let entry = stats.status.entry(full_name).or_insert(vec![]);
+                    entry.push((*inner_time, sim_time));
                 }
             }
         }

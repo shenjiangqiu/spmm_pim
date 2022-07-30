@@ -1,2 +1,4 @@
 result_file = "results/buffer_4"
+[mem_settings]
 store_size = 4
+sender_store_size = 128

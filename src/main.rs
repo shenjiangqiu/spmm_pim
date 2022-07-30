@@ -76,14 +76,24 @@ fn _main(args: Args) -> Result<()> {
                     let mtx_file_name = name.file_stem().unwrap();
                     let trans_pose = csr.transpose_view().to_csr();
                     let two_matrix = TwoMatrix::new(csr, trans_pose);
-                    let time_stats =
-                        spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?
-                            .to_rate();
+                    let (time_stats, detailed_time_status, end_time_stats) =
+                        spmm_pim::sim::Simulator::run(&settings.mem_settings, two_matrix)?;
+                    let time_stats = time_stats.to_rate();
+                    let detailed_time_status = detailed_time_status.to_rate();
                     let file_path = mtx_file_name.to_string_lossy();
                     serde_json::to_writer_pretty(
                         File::create(format!("results/time_stats_{file_path}.json"))?,
                         &time_stats,
                     )?;
+                    serde_json::to_writer_pretty(
+                        File::create(format!("results/detailed_time_status_{file_path}.json"))?,
+                        &detailed_time_status,
+                    )?;
+                    serde_json::to_writer_pretty(
+                        File::create(format!("results/end_time_stats_{file_path}.json"))?,
+                        &end_time_stats,
+                    )?;
+
                     all_results.data.push((file_path.to_string(), time_stats));
                     // write the result to file
 
@@ -155,8 +165,9 @@ mod test_main {
             "spmm_pim",
             "-r",
             "sim",
-            "configs/debug.toml",
+            "configs/large.toml",
             "configs/ddr4.toml",
+            "configs/store_sizes/4.toml",
         ];
         let args = Args::parse_from(args);
         println!("hello world!");
