@@ -1,5 +1,7 @@
 use std::cell::RefCell;
 
+use log::warn;
+
 #[derive(Debug, Default)]
 pub struct QueueTracker {
     pub data: RefCell<Vec<(String, i32)>>,
@@ -22,7 +24,9 @@ impl QueueTracker {
     pub fn deq(&self, id: &QueueTrackerId) {
         let mut data = self.data.borrow_mut();
         data[id.id].1 -= 1;
-        assert!(data[id.id].1 >= 0);
+        if data[id.id].1 < 0 {
+            warn!("error! queue length is negative: {}", data[id.id].1);
+        }
     }
 
     pub fn show_data(&self) {

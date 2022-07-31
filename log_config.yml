@@ -44,3 +44,5 @@ loggers:
   #   level: debug
   # spmm_pim::sim::full_result_merger_worker:
   #   level: debug
+  spmm_pim::sim::task_sender::histo:
+    level: debug
