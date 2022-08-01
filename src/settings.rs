@@ -9,6 +9,11 @@ use eyre::Result;
 use itertools::Itertools;
 use serde::Deserialize;
 
+pub enum RealRowMapping {
+    Chunk,
+    Interleaved(usize),
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub enum RowMapping {
     Chunk,
@@ -17,6 +22,14 @@ pub enum RowMapping {
 impl Default for RowMapping {
     fn default() -> Self {
         RowMapping::Chunk
+    }
+}
+impl RowMapping {
+    pub fn to_real_row_mapping(&self, size: usize) -> RealRowMapping {
+        match self {
+            RowMapping::Chunk => RealRowMapping::Chunk,
+            RowMapping::Interleaved => RealRowMapping::Interleaved(size),
+        }
     }
 }
 
@@ -35,6 +48,7 @@ pub struct MemSettings {
     pub chips: usize,
     pub channels: usize,
     pub row_mapping: RowMapping,
+    pub interleaved_chunk: usize,
 
     // the merger
     pub bank_merger_size: usize,
@@ -66,7 +80,6 @@ pub struct MemSettings {
     pub bank_adder_size: usize,
 
     // the store buffer size
-    pub store_size: usize,
     pub sender_store_size: usize,
 
     // buffer lines

@@ -1,0 +1,3 @@
+result_file = "results/buffer_4"
+[mem_settings]
+sender_store_size = 256

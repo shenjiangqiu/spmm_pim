@@ -77,10 +77,15 @@ where
                     .queue_tracker
                     .deq(self.get_queue_tracker_id_recv());
                 if gap > 10. {
-                    log::error!("error! gap is too large: {}", gap);
+                    log::debug!(target : "spmm_pim::sim::merger_task_sender::timeerror",
+                    "error! gap is too large: {}", gap);
 
                     // print current queue length!
-                    shared_status.queue_tracker.show_data();
+                    log::debug!(
+                        target : "spmm_pim::sim::merger_task_sender::timeerror",
+                        "{}",
+                        shared_status.queue_tracker.show_data()
+                    );
                 }
                 let task = status.into_push_bank_task().unwrap().1;
 
@@ -133,7 +138,7 @@ where
                         let gap = _time - current_time;
                         current_time = _time;
                         if gap > 10. {
-                            log::error!("error! gap is too large: {}", gap);
+                            log::debug!("error! gap is too large: {}", gap);
                             // print current queue length!
                         }
                         shared_status.shared_named_time.add_idle_time(

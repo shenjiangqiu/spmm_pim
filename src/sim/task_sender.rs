@@ -1,6 +1,11 @@
 use std::fmt::Debug;
 
-use crate::{csv_nodata::CsVecNodata, settings::RowMapping, sim::StateWithSharedStatus};
+use crate::{
+    csv_nodata::CsVecNodata,
+    pim::get_bank_id_from_row_id,
+    settings::{RealRowMapping, RowMapping},
+    sim::StateWithSharedStatus,
+};
 use genawaiter::rc::{Co, Gen};
 use itertools::Itertools;
 use log::{debug, info};
@@ -12,8 +17,8 @@ use qsim::ResourceId;
 use sprs::CsMat;
 
 use super::{
-    component::Component, id_translation::get_bank_id_from_row_id, queue_tracker::QueueTrackerId,
-    BankTask, BankTaskEnum, SpmmContex, SpmmStatus,
+    component::Component, queue_tracker::QueueTrackerId, BankTask, BankTaskEnum, SpmmContex,
+    SpmmStatus,
 };
 
 pub struct TaskSender {
@@ -25,7 +30,7 @@ pub struct TaskSender {
     channels: usize,
     chips: usize,
     banks: usize,
-    row_mapping: RowMapping,
+    row_mapping: RealRowMapping,
     queue_tracker_id_send: QueueTrackerId,
 }
 
@@ -65,9 +70,11 @@ impl Component for TaskSender {
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: source id distribution: {:?}", all_source_id);
             let mut channel_dist = vec![0; self.channels];
             let mut chip_dist = vec![0; self.chips * self.channels];
+            let mut chip_standalone = vec![0; self.chips];
             let mut bank_dist = vec![0; self.banks * self.chips * self.channels];
+            let mut bank_standalone = vec![0; self.banks];
             for (_, (_row_id, col_id)) in self.matrix_a.iter() {
-                let ((channel, chip), bank) = get_bank_id_from_row_id(
+                let (((channel, chip), bank), _) = get_bank_id_from_row_id(
                     col_id,
                     self.channels,
                     self.chips,
@@ -77,12 +84,16 @@ impl Component for TaskSender {
                 );
                 channel_dist[channel] += 1;
                 chip_dist[chip + (channel * self.chips)] += 1;
+                chip_standalone[chip] += 1;
                 bank_dist[bank + (channel * self.chips * self.banks) + (chip * self.banks)] += 1;
+                bank_standalone[bank] += 1;
             }
             // print the result:
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: channel distribution: {:?}", channel_dist);
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: chip distribution: {:?}", chip_dist);
+            debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: chip standalone distribution: {:?}", chip_standalone);
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: bank distribution: {:?}", bank_dist);
+            debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: bank standalone distribution: {:?}", bank_standalone);
             // then compute the level distribution
 
             // for each row, first send the index to lower pe, then send a end signal
@@ -105,6 +116,7 @@ impl Component for TaskSender {
                         .unwrap()
                         .to_owned()
                         .into();
+                    debug!(target:"spmm_pim::sim::task_sender::histo","TASKSENDER:target_idx: {} source_idx: {} target_bank: {:?}", target_idx, source_idx, bank_id);
                     debug!("SENDER: {}:{}:{:?}", target_idx, source_idx, row);
                     let row_start = self.matrix_b.indptr().outer_inds_sz(source_idx);
                     let context = co
@@ -115,7 +127,7 @@ impl Component for TaskSender {
                                     from: source_idx,
                                     to: target_idx,
                                     row,
-                                    bank_id,
+                                    bank_id: bank_id.0,
                                     row_shift: row_start.start,
                                     row_size: row_start.end - row_start.start,
                                 }),
@@ -158,7 +170,7 @@ impl TaskSender {
         channels: usize,
         chips: usize,
         banks: usize,
-        row_mapping: RowMapping,
+        row_mapping: RealRowMapping,
         queue_tracker_id_send: QueueTrackerId,
     ) -> Self {
         Self {

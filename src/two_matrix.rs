@@ -2,12 +2,13 @@ use std::{fmt::Debug, mem};
 
 use log::debug;
 
+use rand_distr::num_traits::real::Real;
 use sprs::{CsMat, SpIndex};
 
 use crate::{
     csv_nodata::CsVecNodata,
     pim::{self, AdderTaskBuilder, MergeCycle, PartialSum, Pim},
-    settings::MemSettings,
+    settings::{MemSettings, RealRowMapping, RowMapping},
 };
 
 pub struct TwoMatrix<N1, N2> {
@@ -39,22 +40,27 @@ where
         // contains the rows to read for each bank
         let mut row_stream = vec![vec![]; num_banks];
         // return the bank id and the row id in bank
-
+        let real_row_mapping = match mem_settings.row_mapping {
+            RowMapping::Chunk => RealRowMapping::Chunk,
+            RowMapping::Interleaved => RealRowMapping::Interleaved(mem_settings.interleaved_chunk),
+        };
         for i in self.a.iter() {
             debug!("i: {:?}", i);
             let row_select = i.1 .1.index();
-            let bank_id = pim::get_bank_id_from_row_id(
+            let (((channel_id, chip_id), bank_id), row_id_in_bank) = pim::get_bank_id_from_row_id(
                 row_select,
                 mem_settings.channels,
                 mem_settings.chips,
                 mem_settings.banks,
                 num_rows,
-                &mem_settings.row_mapping,
+                &real_row_mapping,
             );
+            let bank_id = channel_id * mem_settings.chips * mem_settings.banks
+                + chip_id * mem_settings.banks
+                + bank_id;
             debug!("bank_id: {:?}", bank_id);
             // TODO: this is a bug, the row id should not get by row_celect, this real row size of bank is not the row size of the matrixs
             //
-            let row_id_in_bank = pim::get_row_id_in_bank(row_select, mem_settings, num_rows);
             debug!("row_id_in_bank: {:?}", row_id_in_bank);
 
             let row_size = self.b.outer_view(row_select).unwrap().nnz() * mem::size_of::<N2>();
@@ -93,20 +99,26 @@ where
         let merger_size = mem_settings.bank_merger_size;
         let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
         let mut bank_tasks = vec![AdderTaskBuilder::default(); num_banks];
-
+        let real_row_mapping = match mem_settings.row_mapping {
+            RowMapping::Chunk => RealRowMapping::Chunk,
+            RowMapping::Interleaved => RealRowMapping::Interleaved(mem_settings.interleaved_chunk),
+        };
         for i in self.a.iter() {
             let row_select = i.1 .1.index();
             debug!("row_select: {:?}", row_select);
             let target_row = i.1 .0.index();
             debug!("target_row: {:?}", target_row);
-            let bank_id = pim::get_bank_id_from_row_id(
+            let (((channel_id, chip_id), bank_id), row_id_in_bank) = pim::get_bank_id_from_row_id(
                 row_select,
                 mem_settings.channels,
                 mem_settings.chips,
                 mem_settings.banks,
                 self.a.cols(),
-                &mem_settings.row_mapping,
+                &real_row_mapping,
             );
+            let bank_id = channel_id * mem_settings.chips * mem_settings.banks
+                + chip_id * mem_settings.banks
+                + bank_id;
             debug!("bank_id: {:?}", bank_id);
             let row_nnz = self.b.outer_view(row_select).unwrap().nnz();
             debug!("row_nnz: {:?}", row_nnz);

@@ -24,15 +24,14 @@ impl QueueTracker {
     pub fn deq(&self, id: &QueueTrackerId) {
         let mut data = self.data.borrow_mut();
         data[id.id].1 -= 1;
-        if data[id.id].1 < 0 {
-            warn!("error! queue length is negative: {}", data[id.id].1);
-        }
     }
 
-    pub fn show_data(&self) {
+    pub fn show_data(&self) -> String {
         let data = self.data.borrow();
+        let mut ret = String::new();
         for (name, count) in data.iter() {
-            log::error!("{}:{}", name, count);
+            ret += &format!("{}:{}\n", name, count);
         }
+        ret
     }
 }

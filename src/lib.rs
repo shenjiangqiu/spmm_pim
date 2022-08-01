@@ -7,11 +7,11 @@ pub mod pim;
 pub mod reorder_calculator;
 pub mod reorder_system;
 pub mod result;
+pub mod run_main;
 pub mod settings;
 pub mod sim;
 pub mod two_matrix;
 pub mod utils;
-
 use std::{io::BufReader, path::Path};
 use utils::run;
 
@@ -53,6 +53,7 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         chips: 8,
         channels: 2,
         row_mapping: RowMapping::Chunk,
+        interleaved_chunk: 10,
         bank_merger_size: 8,
         chip_merger_size: 8,
         channel_merger_size: 8,
@@ -66,7 +67,6 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         dimm_merger_count: 8,
         row_change_latency: 8,
         bank_adder_size: 8,
-        store_size: 1,
         dimm_buffer_lines: 8,
         channel_buffer_lines: 8,
         chip_buffer_lines: 8,

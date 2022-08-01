@@ -22,7 +22,7 @@ chips = 8
 
 parallel_count = 8
 reorder_count = 8
-row_mapping = "Interleaved"
+row_mapping = "Chunk"
 interleaved_chunk=16
 
 row_size = 512

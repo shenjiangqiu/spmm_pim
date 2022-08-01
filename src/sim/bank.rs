@@ -436,7 +436,7 @@ mod test {
     use qsim::{resources::Store, EndCondition, Simulation};
 
     use crate::{
-        settings::RowMapping,
+        settings::{RealRowMapping, RowMapping},
         sim::{
             final_receiver::FinalReceiver,
             sim_time::{SharedEndTime, SharedNamedTime},
@@ -487,7 +487,7 @@ mod test {
             1,
             1,
             1,
-            RowMapping::Chunk,
+            RealRowMapping::Chunk,
             queue_id_send,
         );
 

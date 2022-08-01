@@ -938,11 +938,10 @@ impl Simulator {
     pub fn run(
         mem_settings: &MemSettings,
         input_matrix: TwoMatrix<i32, i32>,
-    ) -> Result<(TimeStats, DetailedTimeStats, Vec<(String, f64)>), eyre::Report> {
+    ) -> Result<(f64, TimeStats, DetailedTimeStats, Vec<(String, f64)>), eyre::Report> {
         let mut sender_id_to_name_mapping = BTreeMap::<usize, String>::new();
 
         let total_rows = input_matrix.a.rows();
-        let store_size = mem_settings.store_size;
         // now we need a stucture to map the sim_time id to the real component time
 
         // the statistics
@@ -975,8 +974,7 @@ impl Simulator {
         };
         let status = SpmmStatus::new(SpmmStatusEnum::Continue, shared_status.clone());
 
-        let final_receiver_resouce =
-            sim.create_resource(Box::new(Store::new(store_size)), "final_receiver");
+        let final_receiver_resouce = sim.create_resource(Box::new(Store::new(1)), "final_receiver");
         let all_received = Rc::new(RefCell::new(Vec::new()));
         let final_rev = FinalReceiver::new(
             final_receiver_resouce,
@@ -987,12 +985,17 @@ impl Simulator {
 
         p_collector.create_process_and_schedule(&mut sim, final_rev, &status);
         // this store connect the task sender and the Dimm
-        let task_send_store =
-            sim.create_resource(Box::new(Store::new(store_size)), "task_send_store");
+        let task_send_store = sim.create_resource(
+            Box::new(Store::new(mem_settings.sender_store_size)),
+            "task_send_store",
+        );
         sender_id_to_name_mapping.insert(task_send_store, "dimm".to_string());
         let queue_tracker_id_send = shared_status
             .queue_tracker
             .add_component_with_name("channel_sender");
+        let real_row_mapping = mem_settings
+            .row_mapping
+            .to_real_row_mapping(mem_settings.interleaved_chunk);
         let task_sender = TaskSender::new(
             input_matrix.a,
             input_matrix.b,
@@ -1000,7 +1003,7 @@ impl Simulator {
             mem_settings.channels,
             mem_settings.chips,
             mem_settings.banks,
-            mem_settings.row_mapping.clone(),
+            real_row_mapping,
             queue_tracker_id_send,
         );
         p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
@@ -1052,7 +1055,7 @@ impl Simulator {
             .shared_named_time
             .get_detailed_stats(time);
         let end_time_stats = status.shared_status.shared_end_time.get_stats(time);
-        Ok((time_stats, detailed_time_stats, end_time_stats))
+        Ok((time, time_stats, detailed_time_stats, end_time_stats))
     }
 }
 
@@ -1084,6 +1087,7 @@ mod test {
             chips: 2,
             channels: 2,
             row_mapping: RowMapping::Chunk,
+            interleaved_chunk: 10,
             bank_merger_size: 2,
             chip_merger_size: 2,
             channel_merger_size: 2,
@@ -1097,7 +1101,6 @@ mod test {
             dimm_merger_count: 2,
             row_change_latency: 8,
             bank_adder_size: 8,
-            store_size: 1,
             sender_store_size: 4,
             dimm_buffer_lines: 2,
             channel_buffer_lines: 2,

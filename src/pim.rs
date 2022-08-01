@@ -8,7 +8,8 @@ use sprs::SpIndex;
 
 use crate::{
     csv_nodata::CsVecNodata,
-    settings::{MemSettings, RowMapping},
+    settings::{MemSettings, RealRowMapping, RowMapping},
+    sim::id_translation::BankID,
 };
 /// Partial sum
 /// for each element in `data`
@@ -126,18 +127,32 @@ pub trait Pim {
         channel_merge_result: &[PartialSum<usize>],
     ) -> (MergeCycle, PartialSum<usize>);
 }
+pub fn get_bank_id_from_flat_bank_id(
+    flat_bank_id: usize,
+    num_channel: usize,
+    num_chip: usize,
+    num_bank: usize,
+) -> BankID {
+    let channel_id = flat_bank_id / (num_chip * num_bank);
+    assert!(channel_id < num_channel);
+    let chip_id = (flat_bank_id - channel_id * num_chip * num_bank) / num_bank;
 
+    let bank_id = flat_bank_id - channel_id * num_chip * num_bank - chip_id * num_bank;
+
+    ((channel_id, chip_id), bank_id)
+}
+/// return (BankID, row_id in bank)
 pub fn get_bank_id_from_row_id(
     row_id: usize,
     channels: usize,
     chips: usize,
     banks: usize,
     num_rows: usize,
-    row_mapping: &RowMapping,
-) -> usize {
+    row_mapping: &RealRowMapping,
+) -> (BankID, usize) {
     let num_banks = banks * chips * channels;
     match row_mapping {
-        crate::settings::RowMapping::Chunk => {
+        crate::settings::RealRowMapping::Chunk => {
             let rows_per_bank = num_rows / num_banks;
 
             let bank_id = if rows_per_bank == 0 {
@@ -145,31 +160,50 @@ pub fn get_bank_id_from_row_id(
             } else {
                 row_id / rows_per_bank
             };
+            let row_id_in_bank = row_id % rows_per_bank;
 
             if bank_id >= num_banks {
-                row_id % num_banks
+                let target_bank_flat = bank_id % num_banks;
+                (
+                    get_bank_id_from_flat_bank_id(target_bank_flat, channels, chips, banks),
+                    row_id_in_bank,
+                )
             } else {
-                bank_id
+                (
+                    get_bank_id_from_flat_bank_id(bank_id, channels, chips, banks),
+                    row_id_in_bank,
+                )
             }
         }
-        crate::settings::RowMapping::Interleaved => row_id % num_banks,
+        crate::settings::RealRowMapping::Interleaved(chunk_size) => {
+            let row_id = row_id / chunk_size;
+            let channel_id = row_id % channels;
+            let row_id = row_id / channels;
+            let chip_id = row_id % chips;
+            let row_id = row_id / chips;
+            let bank_id = row_id % banks;
+            let row_id = row_id / banks;
+            (((channel_id, chip_id), bank_id), row_id)
+        }
     }
 }
 
-pub fn get_row_id_in_bank(row_id: usize, mem_settings: &MemSettings, num_rows: usize) -> usize {
-    let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
-    match mem_settings.row_mapping {
-        crate::settings::RowMapping::Chunk => {
-            let rows_per_bank = num_rows / num_banks;
-            if rows_per_bank == 0 {
-                row_id
-            } else {
-                row_id % rows_per_bank
-            }
-        }
-        crate::settings::RowMapping::Interleaved => row_id / num_banks,
-    }
-}
+// pub fn get_row_id_in_bank(row_id: usize, mem_settings: &MemSettings, num_rows: usize) -> usize {
+//     let num_banks = mem_settings.banks * mem_settings.chips * mem_settings.channels;
+//     match mem_settings.row_mapping {
+//         crate::settings::RowMapping::Chunk => {
+//             let rows_per_bank = num_rows / num_banks;
+//             if rows_per_bank == 0 {
+//                 row_id
+//             } else {
+//                 row_id % rows_per_bank
+//             }
+//         }
+//         crate::settings::RowMapping::Interleaved => {
+//             row_id / mem_settings.interleaved_chunk / num_banks
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub struct AdderTaskBuilder<I>
