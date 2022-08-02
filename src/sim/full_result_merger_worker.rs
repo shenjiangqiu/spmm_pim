@@ -1,9 +1,14 @@
 //! full result merger worker
 //! it receives the full partial result from the dispatcher and merger them and send it to merger sender
+use crate::sim::types::{PushFullSumType, PushPartialSumType, StateWithSharedStatus};
+
 use super::{
-    buffer_status::BufferStatusId, component::Component, merger_status::MergerStatusId,
-    sim_time::NamedTimeId, FullTaskType, LevelId, SpmmContex, SpmmStatus, SpmmStatusEnum,
-    StateWithSharedStatus,
+    buffer_status::BufferStatusId,
+    component::Component,
+    merger_status::MergerStatusId,
+    sim_time::NamedTimeId,
+    types::{SpmmContex, SpmmGenerator},
+    LevelId, SpmmStatus, SpmmStatusEnum,
 };
 use genawaiter::rc::{Co, Gen};
 use log::debug;
@@ -29,7 +34,7 @@ pub struct FullResultMergerWorker {
 }
 
 impl Component for FullResultMergerWorker {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         // for merger, we need to release the merger when finished. also, we need to release the buffer when the bind mode is applied.
 
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
@@ -56,15 +61,19 @@ impl Component for FullResultMergerWorker {
                     gap,
                 );
 
-                let full_result: FullTaskType = status.into_push_full_partial_task().unwrap().1;
-                let (target_row, total_result) = full_result;
+                let full_result = status.into_push_full_partial_task().unwrap().1;
+                let PushFullSumType {
+                    task_id,
+                    target_row,
+                    target_result,
+                } = full_result;
 
                 debug!(
                     "FULL_RESULT_MERGER_WORKER:{:?}-{}, received target_id: {}",
                     self.level_id, self.id, target_row
                 );
                 let (add_time, merge_time, partial_sum) =
-                    crate::pim::merge_rows_into_one(total_result, self.merger_width);
+                    crate::pim::merge_rows_into_one(target_result, self.merger_width);
                 // wait time in max(add_time, merge_time)
                 let wait_time = std::cmp::max(add_time, merge_time) as f64;
 
@@ -95,7 +104,12 @@ impl Component for FullResultMergerWorker {
                     .yield_(
                         original_status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                             self.queue_id_partial_sum_sender,
-                            (target_row, self.self_sender_id, partial_sum),
+                            PushPartialSumType {
+                                task_id,
+                                target_row,
+                                sender_id: self.self_sender_id,
+                                target_result: partial_sum,
+                            },
                         )),
                     )
                     .await;

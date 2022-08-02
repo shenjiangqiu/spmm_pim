@@ -2,7 +2,6 @@ use std::{fmt::Debug, mem};
 
 use log::debug;
 
-use rand_distr::num_traits::real::Real;
 use sprs::{CsMat, SpIndex};
 
 use crate::{
@@ -108,7 +107,7 @@ where
             debug!("row_select: {:?}", row_select);
             let target_row = i.1 .0.index();
             debug!("target_row: {:?}", target_row);
-            let (((channel_id, chip_id), bank_id), row_id_in_bank) = pim::get_bank_id_from_row_id(
+            let (((channel_id, chip_id), bank_id), _row_id_in_bank) = pim::get_bank_id_from_row_id(
                 row_select,
                 mem_settings.channels,
                 mem_settings.chips,

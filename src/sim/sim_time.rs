@@ -36,6 +36,10 @@ pub struct SharedEndTime {
 pub struct EndTimeId {
     pub id: usize,
 }
+#[derive(Serialize)]
+pub struct AllTimeStats {
+    pub data: Vec<(String, Vec<(String, f64)>)>,
+}
 
 impl SharedEndTime {
     pub fn add_component_with_name(&self, name: impl Into<String>) -> EndTimeId {

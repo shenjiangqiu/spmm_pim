@@ -1,7 +1,7 @@
 //! this module contains the definition of the component trait
 //! - a component is a struct that can spawn a generator throw run() method
 
-use super::{SpmmGenerator, SpmmStatus};
+use super::{types::SpmmGenerator, SpmmStatus};
 
 /// trait Component is the trait that every component should implement
 /// - example:

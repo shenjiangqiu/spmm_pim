@@ -5,9 +5,13 @@
 
 use log::debug;
 
+use crate::sim::types::{PartialSignalType, PushPartialSumType, StateWithSharedStatus};
+
 use super::{
-    component::Component, sim_time::NamedTimeId, LevelId, PartialResultTaskType, PartialSignal,
-    SpmmContex, SpmmStatus, StateWithSharedStatus,
+    component::Component,
+    sim_time::NamedTimeId,
+    types::{SpmmContex, SpmmGenerator},
+    LevelId, SpmmStatus,
 };
 use genawaiter::rc::{Co, Gen};
 
@@ -41,7 +45,7 @@ impl PartialSumSenderBank {
 }
 
 impl Component for PartialSumSenderBank {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // this is used for record the current time before each yield
             let mut current_time = 0.;
@@ -64,24 +68,28 @@ impl Component for PartialSumSenderBank {
                     _gap,
                 );
 
-                let (_resouce_id, partial_task): (usize, PartialResultTaskType) =
-                    status.into_push_partial_task().unwrap();
+                let (_resouce_id, partial_task) = status.into_push_partial_task().unwrap();
+                let PushPartialSumType {
+                    task_id,
+                    target_row,
+                    sender_id,
+                    target_result,
+                } = partial_task;
                 debug!(
                     "PartialSumSenderBank-{:?}: receive partial sum: target_id: {}, sender_id: {}",
-                    self.level_id, partial_task.0, partial_task.1
+                    self.level_id, target_row, sender_id
                 );
 
-                let target_id = partial_task.0;
-                let self_sender_id = partial_task.1;
                 // then send the signle out
                 let context: SpmmContex = co
                     .yield_(
                         original_status.clone_with_state(super::SpmmStatusEnum::PushSignal(
                             self.queue_id_signal_out,
-                            PartialSignal {
-                                self_sender_id,
-                                target_id,
-                                self_queue_id: self.queue_id_partial_sum_out,
+                            PartialSignalType {
+                                sender_id,
+                                target_row,
+                                queue_id: self.queue_id_partial_sum_out,
+                                task_id,
                             },
                         )),
                     )
@@ -102,16 +110,18 @@ impl Component for PartialSumSenderBank {
                     "send_signal",
                     _gap,
                 );
-                debug!(
-                    "PartialSumSenderBank-{:?}: ready to provide data at queue id: {} data:{:?}",
-                    self.level_id, self.queue_id_partial_sum_out, partial_task
-                );
+
                 // then send the real partial sum out
                 let context: SpmmContex = co
                     .yield_(original_status.clone_with_state(
                         super::SpmmStatusEnum::PushPartialTask(
                             self.queue_id_partial_sum_out,
-                            partial_task,
+                            PushPartialSumType {
+                                task_id,
+                                target_row,
+                                sender_id,
+                                target_result,
+                            },
                         ),
                     ))
                     .await;

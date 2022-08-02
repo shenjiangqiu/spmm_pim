@@ -3,21 +3,20 @@ use std::fmt::Debug;
 use crate::{
     csv_nodata::CsVecNodata,
     pim::get_bank_id_from_row_id,
-    settings::{RealRowMapping, RowMapping},
-    sim::StateWithSharedStatus,
+    settings::RealRowMapping,
+    sim::types::{BankTaskEnum, PushBankTaskType, StateWithSharedStatus},
 };
 use genawaiter::rc::{Co, Gen};
 use itertools::Itertools;
 use log::{debug, info};
-use plotters::{
-    prelude::{BitMapBackend, ChartBuilder, Histogram, IntoDrawingArea, IntoSegmentedCoord},
-    style::{Color, RED},
-};
+
 use qsim::ResourceId;
 use sprs::CsMat;
 
 use super::{
-    component::Component, queue_tracker::QueueTrackerId, BankTask, BankTaskEnum, SpmmContex,
+    component::Component,
+    queue_tracker::QueueTrackerId,
+    types::{SpmmContex, SpmmGenerator},
     SpmmStatus,
 };
 
@@ -45,7 +44,7 @@ impl Debug for TaskSender {
 }
 
 impl Component for TaskSender {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let all_send_task = self
                 .matrix_a
@@ -95,7 +94,7 @@ impl Component for TaskSender {
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: bank distribution: {:?}", bank_dist);
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: bank standalone distribution: {:?}", bank_standalone);
             // then compute the level distribution
-
+            let mut task_id = 0;
             // for each row, first send the index to lower pe, then send a end signal
             for (target_idx, vector) in all_send_task.into_iter().enumerate() {
                 let all_source = vector.iter().cloned().collect_vec();
@@ -123,7 +122,8 @@ impl Component for TaskSender {
                         .yield_(original_status.clone_with_state(
                             super::SpmmStatusEnum::PushBankTask(
                                 self.task_sender,
-                                BankTaskEnum::PushBankTask(BankTask {
+                                BankTaskEnum::PushBankTask(PushBankTaskType {
+                                    task_id,
                                     from: source_idx,
                                     to: target_idx,
                                     row,
@@ -156,6 +156,7 @@ impl Component for TaskSender {
                     shared_status,
                 } = status.into_inner();
                 shared_status.queue_tracker.enq(&self.queue_tracker_id_send);
+                task_id += 1;
             }
         };
         Box::new(Gen::new(function))

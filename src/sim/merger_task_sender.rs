@@ -1,15 +1,22 @@
 use std::collections::BTreeSet;
 
-use crate::sim::{StateWithSharedStatus, MEM_ST};
+use crate::sim::{
+    types::{BankTaskEnum, PushBankTaskType, StateWithSharedStatus},
+    MEM_ST,
+};
 use genawaiter::rc::{Co, Gen};
-use itertools::Itertools;
+
 use log::debug;
 use qsim::{ResourceId, SimContext};
 
 use super::{
-    buffer_status::BufferStatusId, component::Component, merger_status::MergerStatusId,
-    queue_tracker::QueueTrackerId, sim_time::NamedTimeId, BankID, BankTask, BankTaskEnum,
-    SpmmContex, SpmmStatus, SpmmStatusEnum,
+    buffer_status::BufferStatusId,
+    component::Component,
+    merger_status::MergerStatusId,
+    queue_tracker::QueueTrackerId,
+    sim_time::NamedTimeId,
+    types::{SpmmContex, SpmmGenerator},
+    BankID, SpmmStatus, SpmmStatusEnum,
 };
 
 pub trait MergerTaskSender {
@@ -50,7 +57,7 @@ where
     T: MergerTaskSender + 'static,
 {
     /// the merger task sender
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let mut current_time = 0.;
             // first get the task
@@ -90,13 +97,14 @@ where
                 let task = status.into_push_bank_task().unwrap().1;
 
                 match task {
-                    super::BankTaskEnum::PushBankTask(BankTask {
+                    BankTaskEnum::PushBankTask(PushBankTaskType {
                         from,
                         to,
                         row,
                         bank_id,
                         row_shift,
                         row_size,
+                        task_id,
                     }) => {
                         // then push to target pe
                         let (lower_index, lower_pe_id) = self.get_lower_id(&bank_id);
@@ -119,7 +127,8 @@ where
                             .yield_(
                                 original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
                                     lower_pe_id,
-                                    BankTaskEnum::PushBankTask(BankTask {
+                                    BankTaskEnum::PushBankTask(PushBankTaskType {
+                                        task_id,
                                         from,
                                         to,
                                         row,
@@ -147,7 +156,7 @@ where
                             gap,
                         );
                     }
-                    super::BankTaskEnum::EndThisTask => {
+                    BankTaskEnum::EndThisTask => {
                         // push this to every lower pe
                         for (lower_pe_id, lower_queue_tracker_id) in self
                             .get_lower_pes()
@@ -158,7 +167,7 @@ where
                                 .yield_(original_status.clone_with_state(
                                     SpmmStatusEnum::PushBankTask(
                                         *lower_pe_id,
-                                        super::BankTaskEnum::EndThisTask,
+                                        BankTaskEnum::EndThisTask,
                                     ),
                                 ))
                                 .await;

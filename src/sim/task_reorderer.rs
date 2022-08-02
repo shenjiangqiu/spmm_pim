@@ -4,11 +4,14 @@
 
 use qsim::ResourceId;
 
+use crate::sim::types::StateWithSharedStatus;
+
 use super::{
-    component::Component, SpmmContex, SpmmGenerator, SpmmStatus, SpmmStatusEnum,
-    StateWithSharedStatus,
+    component::Component,
+    types::{SpmmContex, SpmmGenerator},
+    SpmmStatus, SpmmStatusEnum,
 };
-use genawaiter::{rc::gen, yield_};
+use genawaiter::rc::{Co, Gen};
 pub struct TaskReordererSetting {}
 pub struct TaskReorderer {
     pub task_in: ResourceId,
@@ -32,10 +35,11 @@ impl TaskReorderer {
 
 impl Component for TaskReorderer {
     fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
-        Box::new(gen!({
+        let process = |co: Co<SpmmStatus, SpmmContex>| async move {
             loop {
-                let task: SpmmContex =
-                    yield_!(original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in)));
+                let task = co
+                    .yield_(original_status.clone_with_state(SpmmStatusEnum::Pop(self.task_in)))
+                    .await;
                 let (_time, state) = task.into_inner();
                 let StateWithSharedStatus {
                     status,
@@ -45,9 +49,13 @@ impl Component for TaskReorderer {
                 // do some reorder work
 
                 // finished, push the task
-                yield_!(original_status
-                    .clone_with_state(SpmmStatusEnum::PushBankTask(self.task_out, task)));
+                co.yield_(
+                    original_status
+                        .clone_with_state(SpmmStatusEnum::PushBankTask(self.task_out, task)),
+                )
+                .await;
             }
-        }))
+        };
+        Box::new(Gen::new(process))
     }
 }

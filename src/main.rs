@@ -21,9 +21,9 @@ mod test_main {
             "spmm_pim",
             "-r",
             "sim",
-            "configs/large.toml",
+            "configs/debug.toml",
             "configs/ddr4.toml",
-            "configs/store_sizes/4.toml",
+            "configs/store_sizes/32.toml",
         ];
         let args = Args::parse_from(args);
         println!("hello world!");

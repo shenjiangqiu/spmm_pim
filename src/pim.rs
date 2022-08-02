@@ -8,7 +8,7 @@ use sprs::SpIndex;
 
 use crate::{
     csv_nodata::CsVecNodata,
-    settings::{MemSettings, RealRowMapping, RowMapping},
+    settings::{MemSettings, RealRowMapping},
     sim::id_translation::BankID,
 };
 /// Partial sum

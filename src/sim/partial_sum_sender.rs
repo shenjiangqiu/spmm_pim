@@ -5,11 +5,17 @@
 
 use log::debug;
 
-use crate::sim::SpmmStatusEnum;
+use crate::sim::{
+    types::{PartialSignalType, PushPartialSumType, StateWithSharedStatus},
+    SpmmStatusEnum,
+};
 
 use super::{
-    component::Component, merger_status::MergerStatusId, sim_time::NamedTimeId, LevelId,
-    PartialResultTaskType, PartialSignal, SpmmContex, SpmmStatus, StateWithSharedStatus,
+    component::Component,
+    merger_status::MergerStatusId,
+    sim_time::NamedTimeId,
+    types::{SpmmContex, SpmmGenerator},
+    LevelId, SpmmStatus,
 };
 use genawaiter::rc::{Co, Gen};
 
@@ -56,7 +62,7 @@ impl PartialSumSender {
 }
 
 impl Component for PartialSumSender {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // this is used for record the current time before each yield
             let mut current_time = 0.;
@@ -79,24 +85,28 @@ impl Component for PartialSumSender {
                     _gap,
                 );
 
-                let (_resouce_id, partial_task): (usize, PartialResultTaskType) =
-                    status.into_push_partial_task().unwrap();
+                let (_resouce_id, partial_task) = status.into_push_partial_task().unwrap();
+                let PushPartialSumType {
+                    task_id,
+                    target_row,
+                    sender_id,
+                    target_result,
+                } = partial_task;
                 debug!(
                     "PartialSumSender-{:?}-{}: receive partial sum: target_id: {}, sender_id: {}",
-                    self.level_id, self.id, partial_task.0, partial_task.1
+                    self.level_id, self.id, target_row, sender_id
                 );
 
-                let target_id = partial_task.0;
-                let self_sender_id = partial_task.1;
                 // then send the signle out
                 let context: SpmmContex = co
                     .yield_(
                         original_status.clone_with_state(super::SpmmStatusEnum::PushSignal(
                             self.queue_id_signal_out,
-                            PartialSignal {
-                                self_sender_id,
-                                target_id,
-                                self_queue_id: self.queue_id_partial_sum_out,
+                            PartialSignalType {
+                                queue_id: self.queue_id_partial_sum_out,
+                                task_id,
+                                target_row,
+                                sender_id,
                             },
                         )),
                     )
@@ -117,27 +127,29 @@ impl Component for PartialSumSender {
                     "send_signal",
                     _gap,
                 );
-                debug!(
-                    "PartialSumSender-{:?}-{}: ready to provide data at queue id: {} data:{:?}",
-                    self.level_id, self.id, self.queue_id_partial_sum_out, partial_task
-                );
+
                 // then send the real partial sum out
                 let context: SpmmContex = co
                     .yield_(original_status.clone_with_state(
                         super::SpmmStatusEnum::PushPartialTask(
                             self.queue_id_partial_sum_out,
-                            partial_task,
+                            PushPartialSumType {
+                                task_id,
+                                target_row,
+                                sender_id,
+                                target_result,
+                            },
                         ),
                     ))
                     .await;
                 debug!(
                     "PartialSumSender-{:?}-{}: target_id: {}, send data to id: {:?} and release the merger",
-                    self.level_id, self.id, target_id, self.queue_id_partial_sum_out
+                    self.level_id, self.id, target_row, self.queue_id_partial_sum_out
                 );
                 shared_status.shared_merger_status.release_merger(
                     self.merger_status_id,
                     self.id,
-                    target_id,
+                    target_row,
                     self.is_binding,
                 );
                 //

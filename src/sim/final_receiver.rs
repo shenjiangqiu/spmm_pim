@@ -4,13 +4,13 @@ use genawaiter::rc::{Co, Gen};
 use log::debug;
 use qsim::ResourceId;
 
-use crate::{
-    csv_nodata::CsVecNodata,
-    sim::{PartialResultTaskType, StateWithSharedStatus},
-    two_matrix::TwoMatrix,
-};
+use crate::{csv_nodata::CsVecNodata, sim::types::StateWithSharedStatus, two_matrix::TwoMatrix};
 
-use super::{component::Component, SpmmContex, SpmmStatus, SpmmStatusEnum};
+use super::{
+    component::Component,
+    types::{SpmmContex, SpmmGenerator},
+    SpmmStatus, SpmmStatusEnum,
+};
 #[derive(Debug)]
 pub struct FinalReceiver {
     pub receiver: ResourceId,
@@ -44,7 +44,7 @@ impl FinalReceiver {
 }
 
 impl Component for FinalReceiver {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let mut all_rows_collected = vec![];
             loop {
@@ -57,14 +57,21 @@ impl Component for FinalReceiver {
                     status,
                     shared_status: _,
                 } = pop_status.into_inner();
-                let (_resouce_id, (target_row, sender_id, result)): (usize, PartialResultTaskType) =
-                    status.into_push_partial_task().unwrap();
-                debug!("FINIAL_RECIEVER: {}:{}:{:?}", target_row, sender_id, result);
+                let (_resouce_id, partial_result) = status.into_push_partial_task().unwrap();
+
+                debug!(
+                    "FINIAL_RECIEVER: {}:{}:{:?}",
+                    partial_result.target_row,
+                    partial_result.sender_id,
+                    partial_result.target_result
+                );
                 // there is a bug here, maybe resolve later!
                 // assert_eq!(result.indices, self.result_matrix[target_row].indices);
-                self.all_received.borrow_mut().push(target_row);
+                self.all_received
+                    .borrow_mut()
+                    .push(partial_result.target_row);
                 if self.collect_result {
-                    all_rows_collected.push(target_row);
+                    all_rows_collected.push(partial_result.target_row);
                     debug!(
                         "FINIAL_RECIEVER: all_rows_collected: {:?}",
                         all_rows_collected

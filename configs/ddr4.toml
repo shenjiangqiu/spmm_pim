@@ -24,6 +24,7 @@ parallel_count = 8
 reorder_count = 8
 row_mapping = "Interleaved"
 interleaved_chunk=16
+sender_store_size = 32
 
 row_size = 512
 simd_width = 8

@@ -21,26 +21,15 @@ pub mod sim_time;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
+pub mod types;
 
-use enum_as_inner::EnumAsInner;
-use genawaiter::Coroutine;
 use id_translation::*;
 use itertools::Itertools;
 use log::{debug, error, info};
 use once_cell::sync::OnceCell;
-use qsim::{
-    prelude::*,
-    resources::{CopyDefault, Store},
-};
-use serde::Serialize;
-use sprs::CsMat;
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    fmt::{format, Debug},
-    path::Path,
-    rc::Rc,
-};
+use qsim::{prelude::*, resources::Store};
+
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 pub static MEM_ST: OnceCell<MemSettings> = OnceCell::new();
 use self::{
     bank::{BankPe, BankTaskReorder},
@@ -50,279 +39,27 @@ use self::{
     dimm_merger::DimmMerger,
     final_receiver::FinalReceiver,
     full_result_merger_worker::FullResultMergerWorker,
-    merger_status::SharedMergerStatus,
     merger_task_dispather::MergerWorkerDispatcher,
     partial_sum_collector::PartialSumCollector,
     partial_sum_sender::PartialSumSender,
     partial_sum_sender_bank::PartialSumSenderBank,
     partial_sum_sender_dimm::PartialSumSenderDimm,
     partial_sum_signal_collector::PartialSumSignalCollector,
-    queue_tracker::{QueueTracker, QueueTrackerId},
+    queue_tracker::QueueTrackerId,
     sim_time::{
-        DetailedTimeStats, LevelTime, LevelTimeId, SharedEndTime, SharedNamedTime, SharedSimTime,
-        TimeStats,
+        DetailedTimeStats, LevelTime, LevelTimeId, SharedNamedTime, SharedSimTime, TimeStats,
     },
     task_sender::TaskSender,
+    types::SpmmStatus,
 };
 use crate::{
-    csv_nodata::CsVecNodata, settings::MemSettings, sim::comp_collector::ProcessInfoCollector,
+    settings::MemSettings,
+    sim::{
+        comp_collector::ProcessInfoCollector,
+        types::{SharedStatus, SpmmStatusEnum},
+    },
     two_matrix::TwoMatrix,
 };
-#[derive(Debug, Clone, Default)]
-pub struct BankTask {
-    pub from: usize,
-    pub to: usize,
-    pub row: CsVecNodata<usize>,
-    pub bank_id: BankID,
-    pub row_shift: usize,
-    pub row_size: usize,
-}
-pub fn create_two_matrix_from_file(file_name: &Path) -> TwoMatrix<i32, i32> {
-    let csr: CsMat<i32> = sprs::io::read_matrix_market(file_name).unwrap().to_csr();
-    let trans_pose = csr.transpose_view().to_csr();
-    TwoMatrix::new(csr, trans_pose)
-}
-pub type SpmmContex = SimContext<SpmmStatus>;
-pub type SpmmGenerator =
-    dyn Coroutine<Resume = SpmmContex, Yield = SpmmStatus, Return = ()> + Unpin;
-//todo: add the type
-#[derive(Debug, Clone, EnumAsInner, Default)]
-pub enum BankTaskEnum {
-    PushBankTask(BankTask),
-    #[default]
-    EndThisTask,
-}
-
-/// this struct contains the information of the signale that send from the partial sum sender,
-/// it should contains: 1. the target id, 2. the source id
-/// it will be send by the `partial_sum_sender`
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PartialSignal {
-    pub target_id: usize,
-    pub self_sender_id: usize,
-    pub self_queue_id: usize,
-}
-impl Ord for PartialSignal {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.target_id.cmp(&other.target_id)
-    }
-}
-impl PartialOrd for PartialSignal {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialSignal {
-    pub fn get_queue_id(&self) -> usize {
-        self.self_queue_id
-    }
-}
-
-pub type BankTaskType = BankTaskEnum;
-// target row, sender_id, target result
-pub type PartialResultTaskType = (usize, ResourceId, CsVecNodata<usize>);
-// target row, and all partial result
-pub type FullTaskType = (usize, Vec<CsVecNodata<usize>>);
-pub type BankReadRowTaskType = usize;
-// target queue_id,target_row,is_finished
-pub type ReadyQueueIdType = (usize, usize, bool);
-#[derive(Default, Debug, Clone, EnumAsInner)]
-pub enum SpmmStatusEnum {
-    #[default]
-    Continue,
-    Wait(f64),
-    PushBankTask(ResourceId, BankTaskType),
-    PushPartialTask(ResourceId, PartialResultTaskType),
-    PushReadBankTask(ResourceId, BankReadRowTaskType),
-    PushSignal(ResourceId, PartialSignal),
-    /// (queue_id, is_last)
-    PushReadyQueueId(ResourceId, ReadyQueueIdType),
-    PushFullPartialTask(ResourceId, FullTaskType),
-    PushBufferPopSignal(ResourceId),
-    PushMergerFinishedSignal(ResourceId),
-    Pop(ResourceId),
-}
-
-/// all the shared status that can be modified by all processes
-#[derive(Debug, Clone, Default)]
-pub struct SharedStatus {
-    // fix here, this one is not used because we use buffer status to store the status
-    // pub shared_merger_status: Rc<RefCell<merger_task_sender::FullMergerStatus>>,
-    pub shared_bankpe_status: Rc<RefCell<BTreeMap<PeID, usize>>>,
-    pub shared_sim_time: Rc<SharedSimTime>,
-    pub shared_level_time: Rc<LevelTime>,
-    pub shared_named_time: Rc<SharedNamedTime>,
-    pub shared_buffer_status: Rc<SharedBufferStatus>,
-    pub shared_merger_status: Rc<SharedMergerStatus>,
-    pub shared_end_time: Rc<SharedEndTime>,
-    pub queue_tracker: Rc<QueueTracker>,
-}
-pub struct StateWithSharedStatus {
-    pub status: SpmmStatusEnum,
-    pub shared_status: SharedStatus,
-}
-
-#[derive(Clone)]
-pub struct SpmmStatus {
-    pub state: SpmmStatusEnum,
-
-    // bank pe to task mapping:
-    pub enable_log: bool,
-    pub shared_status: SharedStatus,
-}
-impl Debug for SpmmStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SpmmStatus")
-            .field("state", &self.state)
-            .finish()
-    }
-}
-
-impl CopyDefault for SpmmStatus {
-    fn copy_default(&self) -> Self {
-        let enable_log = self.enable_log;
-
-        let shared_status = self.shared_status.clone();
-        Self {
-            state: SpmmStatusEnum::Continue,
-            enable_log,
-            shared_status,
-        }
-    }
-}
-
-impl SpmmStatus {
-    pub fn new(state: SpmmStatusEnum, shared_status: SharedStatus) -> Self {
-        Self {
-            state,
-            enable_log: false,
-            shared_status,
-        }
-    }
-    // this function is not used any more, because we use buffer status to store the status
-    // pub fn get_target_pe_from_target_row(
-    //     &self,
-    //     status_id: usize,
-    //     target_row: usize,
-    // ) -> Option<usize> {
-    //     self.shared_status
-    //         .shared_merger_status
-    //         .borrow()
-    //         .get_merger_status(status_id)
-    //         .current_working_merger
-    //         .get(&target_row)
-    //         .cloned()
-    // }
-
-    pub fn clone_with_state(&self, state: SpmmStatusEnum) -> Self {
-        Self {
-            state,
-            enable_log: self.enable_log,
-            shared_status: self.shared_status.clone(),
-        }
-    }
-
-    pub fn set_state(self, state: SpmmStatusEnum) -> Self {
-        Self { state, ..self }
-    }
-    pub fn set_log(self, enable_log: bool) -> Self {
-        Self { enable_log, ..self }
-    }
-
-    pub fn new_log(state: SpmmStatusEnum, shared_status: SharedStatus) -> Self {
-        Self {
-            state,
-            enable_log: true,
-            shared_status,
-        }
-    }
-    pub fn state(&self) -> &SpmmStatusEnum {
-        &self.state
-    }
-
-    pub fn into_inner(self) -> StateWithSharedStatus {
-        StateWithSharedStatus {
-            status: self.state,
-            shared_status: self.shared_status,
-        }
-    }
-}
-#[derive(Debug, Clone, EnumAsInner, PartialEq, Eq, PartialOrd, Ord)]
-pub enum LevelId {
-    Dimm,
-    Channel(ChannelID),
-    Bank(BankID),
-    Chip(ChipID),
-}
-
-#[derive(Debug, Clone, EnumAsInner, PartialEq, PartialOrd, Eq, Ord)]
-pub enum PureLevelId {
-    Dimm,
-    Channel,
-    Bank,
-    Chip,
-}
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
-pub struct MergerId {
-    level_id: LevelId,
-    id: usize,
-}
-
-impl SimState for SpmmStatus {
-    fn get_effect(&self) -> Effect {
-        match &self.state {
-            SpmmStatusEnum::Continue => Effect::TimeOut(0.),
-            SpmmStatusEnum::Wait(time) => Effect::TimeOut(*time),
-            SpmmStatusEnum::PushBankTask(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::Pop(rid) => Effect::Pop(*rid),
-            SpmmStatusEnum::PushPartialTask(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::PushReadBankTask(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::PushSignal(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::PushReadyQueueId(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::PushFullPartialTask(rid, _) => Effect::Push(*rid),
-            SpmmStatusEnum::PushBufferPopSignal(rid) => Effect::Push(*rid),
-            SpmmStatusEnum::PushMergerFinishedSignal(rid) => Effect::Push(*rid),
-        }
-    }
-
-    fn set_effect(&mut self, _: Effect) {
-        panic!("set_effect is not supported");
-    }
-
-    fn should_log(&self) -> bool {
-        self.enable_log
-    }
-}
-#[allow(dead_code)]
-struct SimulationReport {}
-#[allow(dead_code)]
-struct SimulationErr {}
-#[allow(dead_code)]
-enum SimulationResult {
-    Ok(SimulationReport),
-    Err(SimulationErr),
-}
-/// # safety:
-/// the comp_ids should all be valid!
-// unsafe fn calculate_raition_rate(
-//     end_time: f64,
-//     comp_ids: &[usize],
-//     shared_comp_time: &ComponentTime,
-// ) -> f64 {
-//     let total_time = end_time * comp_ids.len() as f64;
-//     let idle_time = comp_ids
-//         .iter()
-//         .map(|comp_id| {
-//             shared_comp_time
-//                 .get_idle_time(*comp_id)
-//                 .1
-//                 .iter()
-//                 .sum::<f64>()
-//         })
-//         .sum::<f64>();
-//     idle_time / total_time
-// }
 
 fn build_dimm(
     mem_settings: &MemSettings,
@@ -928,10 +665,7 @@ fn build_bank(
 
     Ok(())
 }
-#[derive(Serialize)]
-pub struct AllTimeStats {
-    pub data: Vec<(String, Vec<(String, f64)>)>,
-}
+
 pub struct Simulator {}
 impl Simulator {
     /// run the simulator

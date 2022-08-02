@@ -1,13 +1,24 @@
-use rand_distr::num_traits::real::Real;
-
-use crate::settings::{RealRowMapping, RowMapping};
+use enum_as_inner::EnumAsInner;
 
 pub type ChannelID = usize;
 pub type ChipID = (ChannelID, usize);
 
 pub type BankID = (ChipID, usize);
 pub type PeID = (BankID, usize);
-
+#[derive(Debug, Clone, EnumAsInner, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LevelId {
+    Dimm,
+    Channel(ChannelID),
+    Bank(BankID),
+    Chip(ChipID),
+}
+#[derive(Debug, Clone, EnumAsInner, PartialEq, PartialOrd, Eq, Ord)]
+pub enum PureLevelId {
+    Dimm,
+    Channel,
+    Bank,
+    Chip,
+}
 pub fn channel_id_from_chip_id(chip_id: &ChipID) -> &ChannelID {
     &chip_id.0
 }
@@ -55,7 +66,6 @@ pub fn channel_id_from_pe_id(pe_id: &PeID) -> &ChannelID {
 
 #[cfg(test)]
 mod test {
-    use crate::settings::{RealRowMapping, RowMapping};
 
     // #[test]
     // fn test_id_trans() {

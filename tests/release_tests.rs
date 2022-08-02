@@ -1,18 +1,10 @@
 use clap::Parser;
 use eyre::Result;
-use log::debug;
 
-use spmm_pim::{
-    args::Args,
-    result::{self, Results},
-    run_2d_unroll_buf, run_main,
-    settings::Settings,
-    utils::run::run_exp_csr,
-};
-use sprs::CsMat;
-use std::path::{Path, PathBuf};
+use spmm_pim::{args::Args, run_main};
 
 #[test]
+#[ignore]
 fn test() -> Result<()> {
     for store in [32, 64, 128, 256, 512] {
         for inter in [1, 2, 4, 8, 16] {
@@ -35,6 +27,7 @@ fn test() -> Result<()> {
     Ok(())
 }
 #[test]
+#[ignore]
 fn collect_data() {
     let mut results = vec![];
     for store in [32, 64, 128, 256, 512] {
@@ -63,6 +56,7 @@ fn collect_data() {
 }
 
 #[test]
+#[ignore]
 fn run_chunck() -> Result<()> {
     for store in [32, 64, 128, 256, 512] {
         let store_config = format!("configs/store_sizes/{store}.toml");
@@ -90,6 +84,7 @@ fn run_chunck() -> Result<()> {
     Ok(())
 }
 #[test]
+#[ignore]
 fn get_chunk() {
     for store in [32, 64, 128, 256, 512] {
         let result_file = format!(

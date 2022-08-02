@@ -1,16 +1,17 @@
 use std::fs;
+use std::fs::File;
 use std::io::{self, Write};
-use std::{env::args_os, fs::File};
 
-use clap::{Command, IntoApp, Parser};
+use clap::{Command, IntoApp};
 use clap_complete::Generator;
 use eyre::{Context, Result};
 use itertools::Itertools;
 use log::{debug, error, info};
 
+use crate::sim::sim_time::AllTimeStats;
 use crate::sim::Simulator;
 
-use super::sim::{AllTimeStats, MEM_ST};
+use super::sim::MEM_ST;
 use super::{
     args::{Args, RunMode},
     result::{self, Results},
@@ -53,7 +54,7 @@ pub fn main(args: Args) -> Result<()> {
     let settings = Settings::new(&config_files).wrap_err("fail to create Setting object")?;
     MEM_ST
         .set(settings.mem_settings.clone())
-        .unwrap_or_else(|e| {
+        .unwrap_or_else(|_e| {
             error!("fail to set mem settings");
         });
     debug!("{:?}", settings);

@@ -1,10 +1,13 @@
 use std::{cmp::Reverse, collections::BinaryHeap};
 
-use crate::csv_nodata::CsVecNodata;
+use crate::{csv_nodata::CsVecNodata, sim::types::PushFullSumType};
 
 use super::{
-    component::Component, merger_status::MergerStatusId, LevelId, SpmmContex, SpmmStatus,
-    SpmmStatusEnum, StateWithSharedStatus,
+    component::Component,
+    id_translation::LevelId,
+    merger_status::MergerStatusId,
+    types::{SpmmContex, SpmmGenerator, SpmmStatus, StateWithSharedStatus},
+    SpmmStatusEnum,
 };
 use genawaiter::rc::{Co, Gen};
 use log::debug;
@@ -23,13 +26,14 @@ pub struct MergerWorkerDispatcher {
 }
 #[derive(PartialEq, Eq)]
 struct TempFullResult {
+    pub task_id: usize,
     pub target_row: usize,
     pub target_result: Vec<CsVecNodata<usize>>,
 }
 
 impl Ord for TempFullResult {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.target_row.cmp(&other.target_row)
+        self.task_id.cmp(&other.task_id)
     }
 }
 impl PartialOrd for TempFullResult {
@@ -39,12 +43,12 @@ impl PartialOrd for TempFullResult {
 }
 
 impl Component for MergerWorkerDispatcher {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let process = |co: Co<SpmmStatus, SpmmContex>| async move {
             // first get the task
             let mut waiting_tasks = BinaryHeap::new();
             loop {
-                let task: SpmmContex = co
+                let task = co
                     .yield_(original_status.clone_with_state(SpmmStatusEnum::Pop(self.full_sum_in)))
                     .await;
                 let (_, ret_status) = task.into_inner();
@@ -54,8 +58,11 @@ impl Component for MergerWorkerDispatcher {
                 } = ret_status.into_inner();
                 match status {
                     SpmmStatusEnum::PushFullPartialTask(_, _) => {
-                        let (target_row, target_result) =
-                            status.into_push_full_partial_task().unwrap().1;
+                        let PushFullSumType {
+                            task_id,
+                            target_row,
+                            target_result,
+                        } = status.into_push_full_partial_task().unwrap().1;
                         debug!(
                             "MergerWorkerDispatcher-{:?}:target_id: {}, from queue: {}",
                             self.level_id, target_row, self.full_sum_in
@@ -74,7 +81,11 @@ impl Component for MergerWorkerDispatcher {
                             co.yield_(original_status.clone_with_state(
                                 SpmmStatusEnum::PushFullPartialTask(
                                     self.merger_task_sender[target_pe],
-                                    (target_row, target_result),
+                                    PushFullSumType {
+                                        task_id,
+                                        target_row,
+                                        target_result,
+                                    },
                                 ),
                             ))
                             .await;
@@ -88,6 +99,7 @@ impl Component for MergerWorkerDispatcher {
                                 self.level_id,target_row,
                             );
                             waiting_tasks.push(Reverse(TempFullResult {
+                                task_id,
                                 target_row,
                                 target_result,
                             }));
@@ -100,6 +112,7 @@ impl Component for MergerWorkerDispatcher {
                         );
                         // some entry is freed, try to push to merger again:
                         for Reverse(TempFullResult {
+                            task_id,
                             target_row,
                             target_result,
                         }) in waiting_tasks.pop()
@@ -120,7 +133,11 @@ impl Component for MergerWorkerDispatcher {
                                 co.yield_(original_status.clone_with_state(
                                     SpmmStatusEnum::PushFullPartialTask(
                                         self.merger_task_sender[target_pe],
-                                        (target_row, target_result),
+                                        PushFullSumType {
+                                            task_id,
+                                            target_row,
+                                            target_result,
+                                        },
                                     ),
                                 ))
                                 .await;
@@ -132,6 +149,7 @@ impl Component for MergerWorkerDispatcher {
                                     self.level_id,target_row,
                                 );
                                 waiting_tasks.push(Reverse(TempFullResult {
+                                    task_id,
                                     target_row,
                                     target_result,
                                 }));

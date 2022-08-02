@@ -4,9 +4,14 @@
 
 use std::{cmp::Reverse, collections::BinaryHeap};
 
+use crate::sim::types::{ReadyQueueIdType, StateWithSharedStatus};
+
 use super::{
-    buffer_status::BufferStatusId, component::Component, sim_time::NamedTimeId, LevelId,
-    PartialSignal, SpmmContex, SpmmStatus, SpmmStatusEnum, StateWithSharedStatus,
+    buffer_status::BufferStatusId,
+    component::Component,
+    sim_time::NamedTimeId,
+    types::{PartialSignalType, SpmmContex, SpmmGenerator},
+    LevelId, SpmmStatus, SpmmStatusEnum,
 };
 use genawaiter::rc::{Co, Gen};
 use log::debug;
@@ -23,11 +28,11 @@ pub struct PartialSumSignalCollector {
 }
 
 impl Component for PartialSumSignalCollector {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let mut current_time = 0.;
             // currently cannot receive the data, store the signal
-            let mut temp_signal_queue: BinaryHeap<Reverse<PartialSignal>> = Default::default();
+            let mut temp_signal_queue: BinaryHeap<Reverse<PartialSignalType>> = Default::default();
 
             loop {
                 // first get the signal
@@ -56,38 +61,47 @@ impl Component for PartialSumSignalCollector {
                 );
 
                 match status {
-                    SpmmStatusEnum::PushSignal(_rid, signal) => {
+                    SpmmStatusEnum::PushSignal(
+                        _rid,
+                        PartialSignalType {
+                            task_id,
+                            target_row,
+                            sender_id,
+                            queue_id,
+                        },
+                    ) => {
                         if shared_status
                             .shared_buffer_status
-                            .can_receive(&self.buffer_status_id, signal.target_id)
+                            .can_receive(&self.buffer_status_id, target_row)
                         {
-                            let finished = shared_status.shared_buffer_status.receive(
+                            let is_finished = shared_status.shared_buffer_status.receive(
                                 &self.buffer_status_id,
-                                signal.target_id,
-                                signal.self_sender_id,
+                                target_row,
+                                sender_id,
                             );
                             debug!(
                                 "PartialSumSignalCollector-{:?}:,target_id: {},finished:{}, receive PushSignal:{:?}",
-                                self.level_id,signal.target_id,finished, signal
+                                self.level_id,target_row,is_finished, target_row
                             );
                             debug!(
                                 "PartialSumSignalCollector-{:?}: try to send PushReadyQueueId:{:?},queue_id:{}",
                                 self.level_id,
-                                (signal.self_queue_id,signal.target_id, finished),self.queue_id_ready_out
+                                (sender_id,target_row, is_finished),self.queue_id_ready_out
                             );
                             let context = co
                                 .yield_(original_status.clone_with_state(
                                     SpmmStatusEnum::PushReadyQueueId(
                                         self.queue_id_ready_out,
-                                        (signal.self_queue_id, signal.target_id, finished),
+                                        ReadyQueueIdType {
+                                            task_id,
+                                            target_row,
+                                            queue_id,
+                                            is_finished,
+                                        },
                                     ),
                                 ))
                                 .await;
-                            debug!(
-                                    "PartialSumSignalCollector-{:?}: finished send PushReadyQueueId:{:?},queue_id:{}",
-                                    self.level_id,
-                                    (signal.self_queue_id,signal.target_id, finished),self.queue_id_ready_out
-                                );
+
                             let (time, status) = context.into_inner();
                             let gap = time - current_time;
                             current_time = time;
@@ -102,14 +116,19 @@ impl Component for PartialSumSignalCollector {
                             );
                         } else {
                             // cannot receive now, store it and resume it later
-                            debug!("PartialSumSignalCollector-{:?}: receive PushSignal:{:?} but cannot send now",self.level_id, signal);
+                            debug!("PartialSumSignalCollector-{:?}: receive PushSignal:{:?} but cannot send now",self.level_id, target_row);
                             debug!(
                                 "the reason cannot receive:{:?}",
                                 shared_status
                                     .shared_buffer_status
                                     .get_current_status(&self.buffer_status_id)
                             );
-                            temp_signal_queue.push(Reverse(signal));
+                            temp_signal_queue.push(Reverse(PartialSignalType {
+                                task_id,
+                                target_row,
+                                sender_id,
+                                queue_id,
+                            }));
                         }
                     }
                     SpmmStatusEnum::PushBufferPopSignal(_rid) => {
@@ -119,25 +138,36 @@ impl Component for PartialSumSignalCollector {
                         );
                         // a buffer entry is popped, resume the signal
 
-                        while let Some(Reverse(signal)) = temp_signal_queue.pop() {
+                        while let Some(Reverse(PartialSignalType {
+                            task_id,
+                            target_row,
+                            sender_id,
+                            queue_id,
+                        })) = temp_signal_queue.pop()
+                        {
                             if shared_status
                                 .shared_buffer_status
-                                .can_receive(&self.buffer_status_id, signal.target_id)
+                                .can_receive(&self.buffer_status_id, target_row)
                             {
                                 let finished = shared_status.shared_buffer_status.receive(
                                     &self.buffer_status_id,
-                                    signal.target_id,
-                                    signal.self_sender_id,
+                                    target_row,
+                                    sender_id,
                                 );
                                 debug!(
                                     "PartialSumSignalCollector-{:?}:try to invoke PushSignal:{:?} queue_id:{}",
-                                    self.level_id, signal,self.queue_id_ready_out
+                                    self.level_id, target_row,self.queue_id_ready_out
                                 );
                                 let context = co
                                     .yield_(original_status.clone_with_state(
                                         SpmmStatusEnum::PushReadyQueueId(
                                             self.queue_id_ready_out,
-                                            (signal.self_queue_id, signal.target_id, finished),
+                                            ReadyQueueIdType {
+                                                task_id,
+                                                target_row,
+                                                queue_id,
+                                                is_finished: finished,
+                                            },
                                         ),
                                     ))
                                     .await;
@@ -156,19 +186,22 @@ impl Component for PartialSumSignalCollector {
 
                                 debug!(
                                     "PartialSumSignalCollector-{:?}: send PushReadyQueueId:{:?}",
-                                    self.level_id,
-                                    (signal.self_queue_id, finished)
+                                    self.level_id, target_row
                                 );
                             } else {
                                 // cannot receive now, store it and resume it later
-                                debug!("PartialSumSignalCollector-{:?}: invoke PushSignal:{:?} but cannot send now",self.level_id, signal);
                                 debug!(
                                     "the reason cannot receive:{:?}",
                                     shared_status
                                         .shared_buffer_status
                                         .get_current_status(&self.buffer_status_id)
                                 );
-                                temp_signal_queue.push(Reverse(signal));
+                                temp_signal_queue.push(Reverse(PartialSignalType {
+                                    task_id,
+                                    target_row,
+                                    sender_id,
+                                    queue_id,
+                                }));
                                 break;
                             }
                         }

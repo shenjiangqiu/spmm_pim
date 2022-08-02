@@ -1,7 +1,11 @@
 use qsim::ResourceId;
 
-use super::{component::Component, SpmmGenerator, SpmmStatus, SpmmStatusEnum};
-use genawaiter::{rc::gen, yield_};
+use super::{
+    component::Component,
+    types::{SpmmContex, SpmmGenerator},
+    SpmmStatus, SpmmStatusEnum,
+};
+use genawaiter::rc::{Co, Gen};
 pub struct TaskRouterConfig {}
 
 pub struct TaskRouter {
@@ -25,8 +29,10 @@ impl TaskRouter {
 
 impl Component for TaskRouter {
     fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
-        Box::new(gen!({
-            yield_!(original_status.clone_with_state(SpmmStatusEnum::Continue));
-        }))
+        let process = |co: Co<SpmmStatus, SpmmContex>| async move {
+            co.yield_(original_status.clone_with_state(SpmmStatusEnum::Continue))
+                .await;
+        };
+        Box::new(Gen::new(process))
     }
 }

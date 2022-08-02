@@ -10,11 +10,12 @@ use super::{
     component::Component,
     queue_tracker::QueueTrackerId,
     sim_time::{EndTimeId, NamedTimeId},
-    BankID, BankTask, LevelId, SpmmContex, SpmmStatus, SpmmStatusEnum,
+    types::{SpmmContex, SpmmGenerator},
+    BankID, LevelId, SpmmStatus, SpmmStatusEnum,
 };
 use crate::{
     pim::merge_rows_into_one,
-    sim::{BankTaskEnum, StateWithSharedStatus},
+    sim::types::{BankTaskEnum, PushBankTaskType, PushPartialSumType, StateWithSharedStatus},
 };
 use genawaiter::rc::{Co, Gen};
 //849191287
@@ -132,10 +133,11 @@ impl BankPe {
 }
 
 impl Component for BankPe {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // first get the task
-            let mut current_task = 0;
+            let mut current_task_id = 0;
+            let mut current_task_target_row = 0;
             let mut tasks = vec![];
             // this is used for record the current time before each yield
             let mut current_time = 0.;
@@ -165,11 +167,14 @@ impl Component for BankPe {
                     .shared_end_time
                     .set_end_time(self.end_time_id, current_time);
                 match bank_task {
-                    BankTaskEnum::PushBankTask(BankTask { to, row, .. }) => {
+                    BankTaskEnum::PushBankTask(PushBankTaskType {
+                        task_id, to, row, ..
+                    }) => {
                         debug!("BANK_PE: receive task: to: row: {},{:?}", to, row);
 
                         tasks.push(row);
-                        current_task = to;
+                        current_task_id = task_id;
+                        current_task_target_row = to;
                     }
                     BankTaskEnum::EndThisTask => {
                         // end this task
@@ -199,7 +204,7 @@ impl Component for BankPe {
                                 "BANK_PE: wait time: {:?} and push to sender: {:?}, the task:{:?}",
                                 wait_time,
                                 self.partial_out,
-                                (current_task, self.task_sender_input_id, &data)
+                                (current_task_target_row, self.task_sender_input_id, &data)
                             );
 
                             shared_status
@@ -209,7 +214,12 @@ impl Component for BankPe {
                             let context = co
                                 .yield_(status.clone_with_state(SpmmStatusEnum::PushPartialTask(
                                     self.partial_out,
-                                    (current_task, self.task_sender_input_id, data),
+                                    PushPartialSumType {
+                                        task_id: current_task_id,
+                                        target_row: current_task_target_row,
+                                        sender_id: self.task_sender_input_id,
+                                        target_result: data,
+                                    },
                                 )))
                                 .await;
                             let (_time, _status) = context.into_inner();
@@ -252,7 +262,7 @@ pub struct BankTaskReorder {
 // TODO
 impl Component for BankTaskReorder {
     #[allow(unused_assignments)]
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let num_pes = self.task_out.len();
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             // todo delete this
@@ -290,7 +300,8 @@ impl Component for BankTaskReorder {
                 let (_resouce_id, task) = status.into_push_bank_task().unwrap();
 
                 match task {
-                    BankTaskEnum::PushBankTask(BankTask {
+                    BankTaskEnum::PushBankTask(PushBankTaskType {
+                        task_id,
                         from,
                         to,
                         row,
@@ -349,7 +360,8 @@ impl Component for BankTaskReorder {
                             .yield_(
                                 original_status.clone_with_state(SpmmStatusEnum::PushBankTask(
                                     self.task_out[current_target_pe],
-                                    BankTaskEnum::PushBankTask(BankTask {
+                                    BankTaskEnum::PushBankTask(PushBankTaskType {
+                                        task_id,
                                         from,
                                         to,
                                         row,
@@ -436,7 +448,7 @@ mod test {
     use qsim::{resources::Store, EndCondition, Simulation};
 
     use crate::{
-        settings::{RealRowMapping, RowMapping},
+        settings::RealRowMapping,
         sim::{
             final_receiver::FinalReceiver,
             sim_time::{SharedEndTime, SharedNamedTime},
@@ -446,7 +458,6 @@ mod test {
     };
 
     use super::*;
-    use crate::sim;
     #[test]
     fn test_bank() {
         let config_str = include_str!("../../log_config.yml");
@@ -458,12 +469,13 @@ mod test {
             SpmmStatusEnum::Continue,
             SharedStatus {
                 shared_named_time: shared_named_time.clone(),
+                shared_end_time: shared_end_time.clone(),
                 ..Default::default()
             },
         );
         debug!("start test");
         let mut simulator = Simulation::new();
-        let two_mat = sim::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
+        let two_mat = crate::utils::create_two_matrix_from_file(Path::new("mtx/test.mtx"));
 
         let task_in = simulator.create_resource(Box::new(Store::new(16)), "test");
         // create a final receiver for partial sum:

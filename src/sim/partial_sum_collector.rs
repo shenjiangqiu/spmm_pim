@@ -4,11 +4,17 @@ use std::collections::BTreeMap;
 
 use log::debug;
 
-use crate::csv_nodata::CsVecNodata;
+use crate::{
+    csv_nodata::CsVecNodata,
+    sim::types::{PushFullSumType, PushPartialSumType, ReadyQueueIdType, StateWithSharedStatus},
+};
 
 use super::{
-    buffer_status::BufferStatusId, component::Component, sim_time::NamedTimeId, LevelId,
-    PartialResultTaskType, SpmmContex, SpmmStatus, StateWithSharedStatus,
+    buffer_status::BufferStatusId,
+    component::Component,
+    sim_time::NamedTimeId,
+    types::{SpmmContex, SpmmGenerator},
+    LevelId, SpmmStatus,
 };
 use genawaiter::rc::{Co, Gen};
 
@@ -30,7 +36,7 @@ pub struct PartialSumCollector {
 }
 
 impl Component for PartialSumCollector {
-    fn run(self, original_status: SpmmStatus) -> Box<super::SpmmGenerator> {
+    fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         // the data collector should should delete the buffer when the standalone mode is applied.Do not delete the buffer when the bind mode is applied.
         // because in bind mode, the merger worker will delete the buffer
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
@@ -63,21 +69,22 @@ impl Component for PartialSumCollector {
                     _gap,
                 );
 
-                let (ready_queue_id, target_row, is_last) =
-                    status.into_push_ready_queue_id().unwrap().1;
+                let ReadyQueueIdType {
+                    task_id: _,
+                    target_row,
+                    queue_id,
+                    is_finished,
+                } = status.into_push_ready_queue_id().unwrap().1;
                 debug!(
                     "PartialSumCollector-{:?}: receive ready queue id target: {target_row} queue_id: {:?}",
-                    self.level_id, ready_queue_id
+                    self.level_id, queue_id
                 );
                 debug!(
                     "PartialSumCollector-{:?}: try to receive data: ready queue id: {:?}",
-                    self.level_id, ready_queue_id
+                    self.level_id, queue_id
                 );
                 let partial_sum_context: SpmmContex = co
-                    .yield_(
-                        original_status
-                            .clone_with_state(super::SpmmStatusEnum::Pop(ready_queue_id)),
-                    )
+                    .yield_(original_status.clone_with_state(super::SpmmStatusEnum::Pop(queue_id)))
                     .await;
 
                 let (time, partial_sum_status) = partial_sum_context.into_inner();
@@ -92,18 +99,22 @@ impl Component for PartialSumCollector {
                     "get_data",
                     _gap,
                 );
-                let (target_row2, _source_pe_id, result): PartialResultTaskType =
-                    status.into_push_partial_task().unwrap().1;
-                assert_eq!(target_row, target_row2,"the signal queue target id is not equal to the data id the queue_id is:{ready_queue_id}, check is the queue is poped by other first??");
+                let PushPartialSumType {
+                    task_id,
+                    target_row,
+                    sender_id: _,
+                    target_result,
+                } = status.into_push_partial_task().unwrap().1;
+                assert_eq!(target_row, target_row,"the signal queue target id is not equal to the data id the queue_id is:{queue_id}, check is the queue is poped by other first??");
                 debug!(
-                    "PartialSumCollector-{:?}: receive partial :{target_row2} last:{is_last} from sum id: {:?}",
-                    self.level_id, ready_queue_id
+                    "PartialSumCollector-{:?}: receive partial :{target_row} last:{is_finished} from sum id: {:?}",
+                    self.level_id, queue_id
                 );
                 current_partial_sum
                     .entry(target_row)
                     .or_insert(vec![])
-                    .push(result);
-                if is_last {
+                    .push(target_result);
+                if is_finished {
                     let finished_result = current_partial_sum.remove(&target_row).unwrap();
                     debug!(
                             "PartialSumCollector-{:?}:self_queue_id_in id: {}, try to push full partial sum to id: {},:{:?} of target row:{target_row}",
@@ -114,7 +125,11 @@ impl Component for PartialSumCollector {
                         .yield_(original_status.clone_with_state(
                             super::SpmmStatusEnum::PushFullPartialTask(
                                 self.queue_id_full_result_out,
-                                (target_row, finished_result),
+                                PushFullSumType {
+                                    task_id,
+                                    target_row,
+                                    target_result: finished_result,
+                                },
                             ),
                         ))
                         .await;

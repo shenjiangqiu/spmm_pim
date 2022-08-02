@@ -1,7 +1,5 @@
 use std::cell::RefCell;
 
-use log::warn;
-
 #[derive(Debug, Default)]
 pub struct QueueTracker {
     pub data: RefCell<Vec<(String, i32)>>,
