@@ -19,15 +19,15 @@ pub struct BufferStatus {
     /// self id
     id: usize,
     /// how many rows can be buffered in total
-    total_rows: usize,
+    total_tasks: usize,
     /// currently occupied rows(store the target row id)
-    occupied_rows: BTreeSet<usize>,
-    /// currently not finsihed rows(waiting for reading from lower pe)
-    /// a row will be in this queue when add the task, it will be removed when the row is finished reciving!
+    occupied_task_ids: BTreeSet<usize>,
+    /// currently not finsihed task ids(waiting for reading from lower pe)
+    /// a task_id will be in this queue when add the task, it will be removed when the task_id is finished reciving!
     /// the front one should be the priority one, and the back one is the latest one.
     /// whe the entry is not enough, the front one will always have a free place to put it in
     waiting_sequence: VecDeque<usize>,
-    /// for each waiting rows, the lower id it waits.
+    /// for each waiting task_id, the lower id it waits.
     waiting_sub_ids: BTreeMap<usize, BTreeSet<usize>>,
 }
 
@@ -40,43 +40,43 @@ impl BufferStatus {
         }
         Self {
             id,
-            total_rows: total_size,
-            occupied_rows: BTreeSet::new(),
+            total_tasks: total_size,
+            occupied_task_ids: BTreeSet::new(),
             waiting_sequence: VecDeque::new(),
             waiting_sub_ids: Default::default(),
         }
     }
     /// add a new target row that will be received later. this should be called by task sender, the row id shoudl be sorted!
-    pub fn add_waiting(&mut self, row: usize, sub_id: usize) {
-        if !self.waiting_sub_ids.contains_key(&row) {
-            self.waiting_sequence.push_back(row);
+    pub fn add_waiting(&mut self, task_id: usize, sub_id: usize) {
+        if !self.waiting_sub_ids.contains_key(&task_id) {
+            self.waiting_sequence.push_back(task_id);
 
-            assert!(self
+            debug_assert!(self
                 .waiting_sequence
                 .iter()
                 .tuple_windows()
                 .all(|(a, b)| a < b));
         }
         self.waiting_sub_ids
-            .entry(row)
+            .entry(task_id)
             .or_insert(BTreeSet::new())
             .insert(sub_id);
     }
     /// test if the buffer will be availiable to receive a new line
-    pub fn can_receive(&self, new_row: usize) -> bool {
-        let remaining = self.total_rows - self.occupied_rows.len();
-        if self.occupied_rows.contains(&new_row) {
+    pub fn can_receive(&self, new_task: usize) -> bool {
+        let remaining = self.total_tasks - self.occupied_task_ids.len();
+        if self.occupied_task_ids.contains(&new_task) {
             return true;
         }
         // do not contains this one
         match remaining {
             0 => false,
             1 => {
-                if self.waiting_sequence.front().unwrap() == &new_row {
+                if self.waiting_sequence.front().unwrap() == &new_task {
                     true
                 } else {
                     if self
-                        .occupied_rows
+                        .occupied_task_ids
                         .contains(self.waiting_sequence.front().unwrap())
                     {
                         // the first line is already in the buffer, so the next we can receive!
@@ -97,27 +97,27 @@ impl BufferStatus {
     /// # Returns:
     /// if a ready line is received, return true, else return false
     #[must_use]
-    pub fn receive(&mut self, new_row: usize, sub_id: usize) -> bool {
+    pub fn receive(&mut self, new_task: usize, sub_id: usize) -> bool {
         // todo: first modify current occupied rows, then modify the track status. if all sub pe have returned, then remove the waiting sequence and trace.
 
         // step 1, add the new row to the occupied rows
         let id = self.id;
-        debug!("BUFFER_STATUS:{id} receive row {new_row},subid: {sub_id}");
-        assert!(self.can_receive(new_row));
-        self.occupied_rows.insert(new_row);
-        assert!(self.occupied_rows.len() <= self.total_rows);
+        debug!("BUFFER_STATUS:{id} receive row {new_task},subid: {sub_id}");
+        assert!(self.can_receive(new_task));
+        self.occupied_task_ids.insert(new_task);
+        assert!(self.occupied_task_ids.len() <= self.total_tasks);
 
         // step 2, remove one of the pe track status
-        let entry = self.waiting_sub_ids.get_mut(&new_row).unwrap();
+        let entry = self.waiting_sub_ids.get_mut(&new_task).unwrap();
 
         let removed = entry.remove(&sub_id);
         assert!(removed);
         if entry.is_empty() {
-            debug!("BUFFER_STATUS:{id} all sub id received {new_row} {sub_id}");
+            debug!("BUFFER_STATUS:{id} all sub id received {new_task} {sub_id}");
             // all sub pe have returned, remove the waiting sequence
-            self.waiting_sub_ids.remove(&new_row);
+            self.waiting_sub_ids.remove(&new_task);
 
-            let entry = self.waiting_sequence.binary_search(&new_row).unwrap();
+            let entry = self.waiting_sequence.binary_search(&new_task).unwrap();
             self.waiting_sequence.remove(entry);
 
             true
@@ -127,10 +127,10 @@ impl BufferStatus {
     }
 
     /// when the pe is ready to make a row to merger pe, remove it from the buffer!
-    pub fn remove(&mut self, row: usize) {
+    pub fn remove(&mut self, task_id: usize) {
         let id = self.id;
-        debug!("BUFFER_STATUS:id:{id} remove row: {row}");
-        let moved = self.occupied_rows.remove(&row);
+        debug!("BUFFER_STATUS:id:{id} remove row: {task_id}");
+        let moved = self.occupied_task_ids.remove(&task_id);
         assert!(moved);
     }
 }
@@ -182,19 +182,19 @@ impl SharedBufferStatus {
     /// # Safety:
     /// - the id must be valid
     #[must_use]
-    pub fn can_receive(&self, comp_id: &BufferStatusId, new_row: usize) -> bool {
+    pub fn can_receive(&self, comp_id: &BufferStatusId, new_task: usize) -> bool {
         let inner = self.inner.borrow();
-        inner.get(comp_id.id).unwrap().can_receive(new_row)
+        inner.get(comp_id.id).unwrap().can_receive(new_task)
     }
     /// # Safety:
     /// - the id must be valid
     /// # Returns:
     /// if a ready line is received, return true, else return false
     #[must_use]
-    pub fn receive(&self, comp_id: &BufferStatusId, new_row: usize, sub_id: usize) -> bool {
+    pub fn receive(&self, comp_id: &BufferStatusId, new_task: usize, sub_id: usize) -> bool {
         let mut inner = self.inner.borrow_mut();
         let buffer = inner.get_mut(comp_id.id).unwrap();
-        buffer.receive(new_row, sub_id)
+        buffer.receive(new_task, sub_id)
     }
     /// # Safety:
     /// - the id must be valid
@@ -205,20 +205,20 @@ impl SharedBufferStatus {
     // }
     /// # Safety:
     /// - the id must be valid
-    pub fn add_waiting(&self, comp_id: &BufferStatusId, row: usize, sub_id: usize) {
+    pub fn add_waiting(&self, comp_id: &BufferStatusId, task_id: usize, sub_id: usize) {
         let mut inner = self.inner.borrow_mut();
         let buffer = inner.get_mut(comp_id.id).unwrap();
-        buffer.add_waiting(row, sub_id);
+        buffer.add_waiting(task_id, sub_id);
     }
 
     /// # Safety:
     /// - the id must be valid
     ///
     /// see the comment of `BufferStatus::remove()`
-    pub fn remove(&self, comp_id: &BufferStatusId, row: usize) {
+    pub fn remove(&self, comp_id: &BufferStatusId, task_id: usize) {
         let mut inner = self.inner.borrow_mut();
         let buffer = inner.get_mut(comp_id.id).unwrap();
-        buffer.remove(row);
+        buffer.remove(task_id);
     }
 
     ///

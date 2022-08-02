@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     csv_nodata::CsVecNodata,
@@ -16,11 +16,12 @@ use sprs::CsMat;
 use super::{
     component::Component,
     queue_tracker::QueueTrackerId,
+    task_balance::TaskScheduler,
     types::{SpmmContex, SpmmGenerator},
     SpmmStatus,
 };
 
-pub struct TaskSender {
+pub struct TaskSender<T> {
     pub matrix_a: CsMat<i32>,
     pub matrix_b: CsMat<i32>,
     pub task_sender: ResourceId,
@@ -31,9 +32,12 @@ pub struct TaskSender {
     banks: usize,
     row_mapping: RealRowMapping,
     queue_tracker_id_send: QueueTrackerId,
+
+    // contructor
+    pub phantom: std::marker::PhantomData<T>,
 }
 
-impl Debug for TaskSender {
+impl<T> Debug for TaskSender<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -43,7 +47,10 @@ impl Debug for TaskSender {
     }
 }
 
-impl Component for TaskSender {
+impl<T> Component for TaskSender<T>
+where
+    T: TaskScheduler,
+{
     fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
             let all_send_task = self
@@ -95,8 +102,9 @@ impl Component for TaskSender {
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: bank standalone distribution: {:?}", bank_standalone);
             // then compute the level distribution
             let mut task_id = 0;
+            let mut task_scheduler = T::build(all_send_task);
             // for each row, first send the index to lower pe, then send a end signal
-            for (target_idx, vector) in all_send_task.into_iter().enumerate() {
+            while let Some((target_idx, vector)) = task_scheduler.get_next_row() {
                 let all_source = vector.iter().cloned().collect_vec();
                 // for every col in this row, push a task to lower pe
                 for source_idx in all_source {
@@ -163,7 +171,7 @@ impl Component for TaskSender {
     }
 }
 
-impl TaskSender {
+impl<T> TaskSender<T> {
     pub fn new(
         matrix_a: CsMat<i32>,
         matrix_b: CsMat<i32>,
@@ -183,6 +191,7 @@ impl TaskSender {
             banks,
             row_mapping,
             queue_tracker_id_send,
+            phantom: PhantomData,
         }
     }
 }

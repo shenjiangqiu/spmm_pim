@@ -18,6 +18,7 @@ pub mod partial_sum_sender_dimm;
 pub mod partial_sum_signal_collector;
 pub mod queue_tracker;
 pub mod sim_time;
+mod task_balance;
 pub mod task_reorderer;
 pub mod task_router;
 pub mod task_sender;
@@ -29,8 +30,6 @@ use log::{debug, error, info};
 use once_cell::sync::OnceCell;
 use qsim::{prelude::*, resources::Store};
 
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
-pub static MEM_ST: OnceCell<MemSettings> = OnceCell::new();
 use self::{
     bank::{BankPe, BankTaskReorder},
     buffer_status::SharedBufferStatus,
@@ -56,10 +55,15 @@ use crate::{
     settings::MemSettings,
     sim::{
         comp_collector::ProcessInfoCollector,
+        merger_status::SharedMergerStatus,
+        queue_tracker::QueueTracker,
+        sim_time::SharedEndTime,
+        task_balance::{DefaultTaskScheduler, RandomTaskScheduler},
         types::{SharedStatus, SpmmStatusEnum},
     },
     two_matrix::TwoMatrix,
 };
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 fn build_dimm(
     mem_settings: &MemSettings,
@@ -695,17 +699,22 @@ impl Simulator {
         let shared_named_time = Rc::new(SharedNamedTime::new());
         let shared_buffer_status = Rc::new(SharedBufferStatus::default());
         let sim_time = Rc::new(SharedSimTime::new());
-        let merger_status = Default::default();
-
+        let shared_merger_status = Rc::new(SharedMergerStatus::new(
+            mem_settings.buffer_mode.is_bind_merger(),
+        ));
+        let shared_end_time = Rc::new(SharedEndTime::new());
+        let queue_tracker = Rc::new(QueueTracker::new());
         let shared_status = SharedStatus {
             shared_bankpe_status: bankpe_status,
             shared_sim_time: sim_time,
             shared_level_time,
             shared_named_time,
             shared_buffer_status,
-            shared_merger_status: merger_status,
-            ..Default::default()
+            shared_merger_status,
+            shared_end_time,
+            queue_tracker,
         };
+
         let status = SpmmStatus::new(SpmmStatusEnum::Continue, shared_status.clone());
 
         let final_receiver_resouce = sim.create_resource(Box::new(Store::new(1)), "final_receiver");
@@ -730,17 +739,34 @@ impl Simulator {
         let real_row_mapping = mem_settings
             .row_mapping
             .to_real_row_mapping(mem_settings.interleaved_chunk);
-        let task_sender = TaskSender::new(
-            input_matrix.a,
-            input_matrix.b,
-            task_send_store,
-            mem_settings.channels,
-            mem_settings.chips,
-            mem_settings.banks,
-            real_row_mapping,
-            queue_tracker_id_send,
-        );
-        p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
+        match mem_settings.task_scheduler_mode {
+            crate::settings::TaskSchedulerMode::Sequence => {
+                let task_sender = TaskSender::<DefaultTaskScheduler>::new(
+                    input_matrix.a,
+                    input_matrix.b,
+                    task_send_store,
+                    mem_settings.channels,
+                    mem_settings.chips,
+                    mem_settings.banks,
+                    real_row_mapping,
+                    queue_tracker_id_send,
+                );
+                p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
+            }
+            crate::settings::TaskSchedulerMode::Shuffle => {
+                let task_sender = TaskSender::<RandomTaskScheduler>::new(
+                    input_matrix.a,
+                    input_matrix.b,
+                    task_send_store,
+                    mem_settings.channels,
+                    mem_settings.chips,
+                    mem_settings.banks,
+                    real_row_mapping,
+                    queue_tracker_id_send,
+                );
+                p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
+            }
+        }
 
         build_dimm(
             mem_settings,
@@ -798,7 +824,10 @@ mod test {
 
     use sprs::CsMat;
 
-    use crate::settings::{BufferMode, RowMapping};
+    use crate::{
+        settings::{BufferMode, RowMapping, TaskSchedulerMode},
+        sim::task_balance::TaskScheduler,
+    };
 
     use super::*;
 
@@ -840,8 +869,8 @@ mod test {
             channel_buffer_lines: 2,
             chip_buffer_lines: 2,
             buffer_mode: BufferMode::Standalone,
+            task_scheduler_mode: TaskSchedulerMode::Shuffle,
         };
-        MEM_ST.set(mem_settings.clone()).unwrap();
         Simulator::run(&mem_settings, two_matrix).unwrap();
     }
 }

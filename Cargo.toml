@@ -30,11 +30,12 @@ rand_xorshift = "0.3.0"
 reqwest = {version = "0.11.10", features = ["blocking"]}
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0.79"
-serde_yaml = "0.8.24"
+serde_yaml = "0.9.2"
 sprs = "0.11.0"
 toml = "0.5.9"
 wasm-bindgen = "0.2.81"
 wasm-bindgen-futures = "0.4.30"
 wasm-bindgen-test = "0.3.30"
+rayon = "1.5.3"
 [profile.release]
 lto = true

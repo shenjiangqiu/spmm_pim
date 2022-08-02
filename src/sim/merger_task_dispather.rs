@@ -69,7 +69,7 @@ impl Component for MergerWorkerDispatcher {
                         );
                         if let Some(target_pe) = shared_status.shared_merger_status.get_next_merger(
                             self.merger_status_id,
-                            target_row,
+                            task_id,
                             self.is_binding,
                         ) {
                             // find a empty merger!
@@ -123,7 +123,7 @@ impl Component for MergerWorkerDispatcher {
                             );
                             if let Some(target_pe) = shared_status
                                 .shared_merger_status
-                                .get_next_merger(self.merger_status_id, target_row, self.is_binding)
+                                .get_next_merger(self.merger_status_id, task_id, self.is_binding)
                             {
                                 // push to that merger
                                 // find a empty merger!

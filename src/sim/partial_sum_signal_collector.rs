@@ -72,11 +72,11 @@ impl Component for PartialSumSignalCollector {
                     ) => {
                         if shared_status
                             .shared_buffer_status
-                            .can_receive(&self.buffer_status_id, target_row)
+                            .can_receive(&self.buffer_status_id, task_id)
                         {
                             let is_finished = shared_status.shared_buffer_status.receive(
                                 &self.buffer_status_id,
-                                target_row,
+                                task_id,
                                 sender_id,
                             );
                             debug!(
@@ -147,16 +147,16 @@ impl Component for PartialSumSignalCollector {
                         {
                             if shared_status
                                 .shared_buffer_status
-                                .can_receive(&self.buffer_status_id, target_row)
+                                .can_receive(&self.buffer_status_id, task_id)
                             {
                                 let finished = shared_status.shared_buffer_status.receive(
                                     &self.buffer_status_id,
-                                    target_row,
+                                    task_id,
                                     sender_id,
                                 );
                                 debug!(
                                     "PartialSumSignalCollector-{:?}:try to invoke PushSignal:{:?} queue_id:{}",
-                                    self.level_id, target_row,self.queue_id_ready_out
+                                    self.level_id, task_id,self.queue_id_ready_out
                                 );
                                 let context = co
                                     .yield_(original_status.clone_with_state(

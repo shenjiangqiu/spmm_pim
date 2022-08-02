@@ -42,6 +42,11 @@ pub struct AllTimeStats {
 }
 
 impl SharedEndTime {
+    pub fn new() -> Self {
+        Self {
+            data: RefCell::new(vec![]),
+        }
+    }
     pub fn add_component_with_name(&self, name: impl Into<String>) -> EndTimeId {
         self.data.borrow_mut().push((name.into(), 0.0));
         EndTimeId {

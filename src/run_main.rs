@@ -6,12 +6,11 @@ use clap::{Command, IntoApp};
 use clap_complete::Generator;
 use eyre::{Context, Result};
 use itertools::Itertools;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 
 use crate::sim::sim_time::AllTimeStats;
 use crate::sim::Simulator;
 
-use super::sim::MEM_ST;
 use super::{
     args::{Args, RunMode},
     result::{self, Results},
@@ -30,7 +29,7 @@ pub fn main(args: Args) -> Result<()> {
     let config_str = include_str!("../log_config.yml");
     let config = serde_yaml::from_str(config_str).unwrap();
     log4rs::init_raw_config(config).unwrap_or_else(|err| {
-        error!("log4rs init error: {}", err);
+        warn!("log4rs init error: {}", err);
     });
 
     let start_time = std::time::Instant::now();
@@ -52,11 +51,7 @@ pub fn main(args: Args) -> Result<()> {
     println!("config");
 
     let settings = Settings::new(&config_files).wrap_err("fail to create Setting object")?;
-    MEM_ST
-        .set(settings.mem_settings.clone())
-        .unwrap_or_else(|_e| {
-            error!("fail to set mem settings");
-        });
+
     debug!("{:?}", settings);
     let mtxs = settings.mtx_files.clone();
     let run_mode = args.run_mode.unwrap_or(RunMode::Sim);
@@ -84,20 +79,21 @@ pub fn main(args: Args) -> Result<()> {
                     let task_queue_size = settings.mem_settings.sender_store_size;
                     let interleaving_chunk_size = settings.mem_settings.interleaved_chunk;
                     let row_mapping=&settings.mem_settings.row_mapping;
+                    let scheduler_mode=&settings.mem_settings.task_scheduler_mode;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/full_time_{row_mapping:?}_{task_queue_size}_{interleaving_chunk_size}_{file_path}.json"))?,
+                        File::create(format!("results/full_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_{file_path}.json"))?,
                         &time,
                     )?;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/time_stats_{row_mapping:?}_{task_queue_size}_{interleaving_chunk_size}_{file_path}.json"))?,
+                        File::create(format!("results/time_stats_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_{file_path}.json"))?,
                         &time_stats,
                     )?;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/detailed_time_{row_mapping:?}_{task_queue_size}_{interleaving_chunk_size}_status_{file_path}.json"))?,
+                        File::create(format!("results/detailed_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_status_{file_path}.json"))?,
                         &detailed_time_status,
                     )?;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/end_time_{row_mapping:?}_{task_queue_size}_{interleaving_chunk_size}_stats_{file_path}.json"))?,
+                        File::create(format!("results/end_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_stats_{file_path}.json"))?,
                         &end_time_stats,
                     )?;
 
@@ -113,13 +109,13 @@ pub fn main(args: Args) -> Result<()> {
                     Err(e) => error!("{:?}", e),
                 }
             }
-            let time_stats_output = serde_json::to_string_pretty(&all_results)
-                .wrap_err("fail to serialize all_results")?;
-            // write the result to file "all_results.json"
-            let file_name = "results/time_stats_all_results.json";
-            let mut _file = File::create(&file_name)
-                .wrap_err(format!("the path: {} is invalid!", file_name))?;
-            writeln!(_file, "{}", time_stats_output)?;
+            // let time_stats_output = serde_json::to_string_pretty(&all_results)
+            //     .wrap_err("fail to serialize all_results")?;
+            // // write the result to file "all_results.json"
+            // let file_name = "results/time_stats_all_results.json";
+            // let mut _file = File::create(&file_name)
+            //     .wrap_err(format!("the path: {} is invalid!", file_name))?;
+            // writeln!(_file, "{}", time_stats_output)?;
             Ok(())
         }
         RunMode::Pim => {

@@ -111,11 +111,11 @@ impl Component for PartialSumCollector {
                     self.level_id, queue_id
                 );
                 current_partial_sum
-                    .entry(target_row)
+                    .entry(task_id)
                     .or_insert(vec![])
                     .push(target_result);
                 if is_finished {
-                    let finished_result = current_partial_sum.remove(&target_row).unwrap();
+                    let finished_result = current_partial_sum.remove(&task_id).unwrap();
                     debug!(
                             "PartialSumCollector-{:?}:self_queue_id_in id: {}, try to push full partial sum to id: {},:{:?} of target row:{target_row}",
                             self.level_id,self.queue_id_full_result_out,self.queue_id_ready_in, finished_result
@@ -144,7 +144,7 @@ impl Component for PartialSumCollector {
                         // it's not bind mode, so the merger worker will not delete the buffer, so we should delete the buffer here
                         shared_status
                             .shared_buffer_status
-                            .remove(&self.buffer_status_id, target_row);
+                            .remove(&self.buffer_status_id, task_id);
                     }
 
                     shared_status.shared_named_time.add_idle_time(

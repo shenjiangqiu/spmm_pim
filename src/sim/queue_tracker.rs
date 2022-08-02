@@ -9,6 +9,11 @@ pub struct QueueTrackerId {
     pub id: usize,
 }
 impl QueueTracker {
+    pub fn new() -> Self {
+        Self {
+            data: RefCell::new(vec![]),
+        }
+    }
     pub fn add_component_with_name(&self, name: impl Into<String>) -> QueueTrackerId {
         let mut data = self.data.borrow_mut();
         data.push((name.into(), 0));

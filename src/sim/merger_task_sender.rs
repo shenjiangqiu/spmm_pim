@@ -1,9 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::sim::{
-    types::{BankTaskEnum, PushBankTaskType, StateWithSharedStatus},
-    MEM_ST,
-};
+use crate::sim::types::{BankTaskEnum, PushBankTaskType, StateWithSharedStatus};
 use genawaiter::rc::{Co, Gen};
 
 use log::debug;
@@ -112,16 +109,14 @@ where
                         // record that the task is on going to lower_pe_id, record it!
                         shared_status.shared_buffer_status.add_waiting(
                             self.get_buffer_id(),
-                            to,
+                            task_id,
                             lower_pe_id,
                         );
 
                         // record the merger that the target row is about to come!
-                        shared_status.shared_merger_status.add_waiting(
-                            self.get_merger_status_id(),
-                            to,
-                            MEM_ST.get().unwrap().buffer_mode.is_bind_merger(),
-                        );
+                        shared_status
+                            .shared_merger_status
+                            .add_waiting(self.get_merger_status_id(), task_id);
 
                         let context = co
                             .yield_(

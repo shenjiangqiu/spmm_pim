@@ -452,6 +452,7 @@ mod test {
         sim::{
             final_receiver::FinalReceiver,
             sim_time::{SharedEndTime, SharedNamedTime},
+            task_balance::DefaultTaskScheduler,
             task_sender::TaskSender,
             SharedStatus, SpmmStatus,
         },
@@ -492,7 +493,7 @@ mod test {
             .shared_status
             .queue_tracker
             .add_component_with_name("123");
-        let task_sender = TaskSender::new(
+        let task_sender = TaskSender::<DefaultTaskScheduler>::new(
             two_mat.a,
             two_mat.b,
             task_in,

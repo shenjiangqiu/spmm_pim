@@ -39,6 +39,13 @@ pub enum BufferMode {
     BindMerger,
     Standalone,
 }
+#[derive(Debug, Deserialize, Clone, Default, EnumAsInner)]
+pub enum TaskSchedulerMode {
+    #[default]
+    Sequence,
+    Shuffle,
+}
+
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct MemSettings {
     pub buffer_mode: BufferMode,
@@ -86,6 +93,7 @@ pub struct MemSettings {
     pub dimm_buffer_lines: usize,
     pub channel_buffer_lines: usize,
     pub chip_buffer_lines: usize,
+    pub task_scheduler_mode: TaskSchedulerMode,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

@@ -113,7 +113,7 @@ impl Component for PartialSumSenderDimm {
                 shared_status.shared_merger_status.release_merger(
                     self.merger_status_id,
                     self.id,
-                    target_row,
+                    task_id,
                     self.is_binding,
                 );
                 //

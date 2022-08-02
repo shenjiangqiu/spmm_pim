@@ -92,7 +92,7 @@ impl Component for FullResultMergerWorker {
                 if self.is_bind {
                     shared_status
                         .shared_buffer_status
-                        .remove(&self.buffer_status_id, target_row);
+                        .remove(&self.buffer_status_id, task_id);
                 }
 
                 debug!(
