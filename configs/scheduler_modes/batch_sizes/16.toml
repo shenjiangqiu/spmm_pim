@@ -1,0 +1,3 @@
+
+[mem_settings]
+task_scheduler_chunk_size = "16"

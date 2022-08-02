@@ -3,34 +3,34 @@ bank_merger_count = 2
 bank_merger_size = 16
 banks = 8
 
+dimm_buffer_lines = 16
 dimm_merger_count = 16
 dimm_merger_size = 16
-dimm_buffer_lines = 16
 
-
+channel_buffer_lines = 8
 channel_merger_count = 8
 channel_merger_size = 16
-channel_buffer_lines = 8
 
 channels = 2
 
+chip_buffer_lines = 8
 chip_merger_count = 8
 chip_merger_size = 16
-chip_buffer_lines = 8
 
 chips = 8
 
+interleaved_chunk = 16
 parallel_count = 8
 reorder_count = 8
 row_mapping = "Interleaved"
-interleaved_chunk=16
 sender_store_size = 32
 
 row_size = 512
 simd_width = 8
 
 bank_adder_size = 16
+buffer_mode = "Standalone"
 row_change_latency = 33
 store_size = 8
-buffer_mode="Standalone"
+task_scheduler_chunk_size = 16
 task_scheduler_mode = "Sequence"

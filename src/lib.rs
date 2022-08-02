@@ -73,6 +73,7 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
         buffer_mode: BufferMode::BindMerger,
         sender_store_size: 4,
         task_scheduler_mode: Default::default(),
+        task_scheduler_chunk_size: 4,
     };
     let csr: CsMat<_> = tri.to_csr();
 

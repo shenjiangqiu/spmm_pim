@@ -27,7 +27,7 @@ pub mod types;
 use id_translation::*;
 use itertools::Itertools;
 use log::{debug, error, info};
-use once_cell::sync::OnceCell;
+
 use qsim::{prelude::*, resources::Store};
 
 use self::{
@@ -52,13 +52,14 @@ use self::{
     types::SpmmStatus,
 };
 use crate::{
+    csv_nodata::CsVecNodata,
     settings::MemSettings,
     sim::{
         comp_collector::ProcessInfoCollector,
         merger_status::SharedMergerStatus,
         queue_tracker::QueueTracker,
         sim_time::SharedEndTime,
-        task_balance::{DefaultTaskScheduler, RandomTaskScheduler},
+        task_balance::{BatchShuffleScheduler, DefaultTaskScheduler, RandomTaskScheduler},
         types::{SharedStatus, SpmmStatusEnum},
     },
     two_matrix::TwoMatrix,
@@ -739,9 +740,14 @@ impl Simulator {
         let real_row_mapping = mem_settings
             .row_mapping
             .to_real_row_mapping(mem_settings.interleaved_chunk);
+        let all_send_task = input_matrix
+            .a
+            .outer_iterator()
+            .map(|x| CsVecNodata::from(x.to_owned()))
+            .collect_vec();
         match mem_settings.task_scheduler_mode {
             crate::settings::TaskSchedulerMode::Sequence => {
-                let task_sender = TaskSender::<DefaultTaskScheduler>::new(
+                let task_sender = TaskSender::new(
                     input_matrix.a,
                     input_matrix.b,
                     task_send_store,
@@ -750,6 +756,7 @@ impl Simulator {
                     mem_settings.banks,
                     real_row_mapping,
                     queue_tracker_id_send,
+                    DefaultTaskScheduler::new(all_send_task),
                 );
                 p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
             }
@@ -763,6 +770,24 @@ impl Simulator {
                     mem_settings.banks,
                     real_row_mapping,
                     queue_tracker_id_send,
+                    RandomTaskScheduler::new(all_send_task),
+                );
+                p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
+            }
+            crate::settings::TaskSchedulerMode::ChunkShuffle => {
+                let task_sender = TaskSender::new(
+                    input_matrix.a,
+                    input_matrix.b,
+                    task_send_store,
+                    mem_settings.channels,
+                    mem_settings.chips,
+                    mem_settings.banks,
+                    real_row_mapping,
+                    queue_tracker_id_send,
+                    BatchShuffleScheduler::new(
+                        mem_settings.task_scheduler_chunk_size,
+                        all_send_task,
+                    ),
                 );
                 p_collector.create_process_and_schedule(&mut sim, task_sender, &status);
             }
@@ -824,10 +849,7 @@ mod test {
 
     use sprs::CsMat;
 
-    use crate::{
-        settings::{BufferMode, RowMapping, TaskSchedulerMode},
-        sim::task_balance::TaskScheduler,
-    };
+    use crate::settings::{BufferMode, RowMapping, TaskSchedulerMode};
 
     use super::*;
 
@@ -870,6 +892,7 @@ mod test {
             chip_buffer_lines: 2,
             buffer_mode: BufferMode::Standalone,
             task_scheduler_mode: TaskSchedulerMode::Shuffle,
+            task_scheduler_chunk_size: 32,
         };
         Simulator::run(&mem_settings, two_matrix).unwrap();
     }

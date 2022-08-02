@@ -44,6 +44,7 @@ pub enum TaskSchedulerMode {
     #[default]
     Sequence,
     Shuffle,
+    ChunkShuffle,
 }
 
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -94,6 +95,7 @@ pub struct MemSettings {
     pub channel_buffer_lines: usize,
     pub chip_buffer_lines: usize,
     pub task_scheduler_mode: TaskSchedulerMode,
+    pub task_scheduler_chunk_size: usize,
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

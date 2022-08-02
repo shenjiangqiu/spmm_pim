@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use crate::{
     csv_nodata::CsVecNodata,
@@ -16,7 +16,6 @@ use sprs::CsMat;
 use super::{
     component::Component,
     queue_tracker::QueueTrackerId,
-    task_balance::TaskScheduler,
     types::{SpmmContex, SpmmGenerator},
     SpmmStatus,
 };
@@ -34,7 +33,7 @@ pub struct TaskSender<T> {
     queue_tracker_id_send: QueueTrackerId,
 
     // contructor
-    pub phantom: std::marker::PhantomData<T>,
+    pub task_generator: T,
 }
 
 impl<T> Debug for TaskSender<T> {
@@ -49,15 +48,10 @@ impl<T> Debug for TaskSender<T> {
 
 impl<T> Component for TaskSender<T>
 where
-    T: TaskScheduler,
+    T: IntoIterator<Item = (usize, CsVecNodata<usize>)> + 'static,
 {
     fn run(self, original_status: SpmmStatus) -> Box<SpmmGenerator> {
         let function = |co: Co<SpmmStatus, SpmmContex>| async move {
-            let all_send_task = self
-                .matrix_a
-                .outer_iterator()
-                .map(|x| CsVecNodata::from(x.to_owned()))
-                .collect_vec();
             info!(
                 "TaskSender: Total a:rows: {}, total a:cols: {}",
                 self.matrix_a.rows(),
@@ -102,9 +96,8 @@ where
             debug!(target:"spmm_pim::sim::task_sender::histo","TaskSender: bank standalone distribution: {:?}", bank_standalone);
             // then compute the level distribution
             let mut task_id = 0;
-            let mut task_scheduler = T::build(all_send_task);
             // for each row, first send the index to lower pe, then send a end signal
-            while let Some((target_idx, vector)) = task_scheduler.get_next_row() {
+            for (target_idx, vector) in self.task_generator.into_iter() {
                 let all_source = vector.iter().cloned().collect_vec();
                 // for every col in this row, push a task to lower pe
                 for source_idx in all_source {
@@ -181,6 +174,7 @@ impl<T> TaskSender<T> {
         banks: usize,
         row_mapping: RealRowMapping,
         queue_tracker_id_send: QueueTrackerId,
+        task_generator: T,
     ) -> Self {
         Self {
             matrix_a,
@@ -191,7 +185,7 @@ impl<T> TaskSender<T> {
             banks,
             row_mapping,
             queue_tracker_id_send,
-            phantom: PhantomData,
+            task_generator,
         }
     }
 }

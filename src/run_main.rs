@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self};
 
 use clap::{Command, IntoApp};
 use clap_complete::Generator;
@@ -80,20 +80,21 @@ pub fn main(args: Args) -> Result<()> {
                     let interleaving_chunk_size = settings.mem_settings.interleaved_chunk;
                     let row_mapping=&settings.mem_settings.row_mapping;
                     let scheduler_mode=&settings.mem_settings.task_scheduler_mode;
+                    let batch_size=settings.mem_settings.task_scheduler_chunk_size;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/full_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_{file_path}.json"))?,
+                        File::create(format!("results/full_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_{batch_size}_{file_path}.json"))?,
                         &time,
                     )?;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/time_stats_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_{file_path}.json"))?,
+                        File::create(format!("results/time_stats_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_{batch_size}_{file_path}.json"))?,
                         &time_stats,
                     )?;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/detailed_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_status_{file_path}.json"))?,
+                        File::create(format!("results/detailed_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_status_{batch_size}_{file_path}.json"))?,
                         &detailed_time_status,
                     )?;
                     serde_json::to_writer_pretty(
-                        File::create(format!("results/end_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_stats_{file_path}.json"))?,
+                        File::create(format!("results/end_time_{row_mapping:?}_{scheduler_mode:?}_{task_queue_size}_{interleaving_chunk_size}_stats_{batch_size}_{file_path}.json"))?,
                         &end_time_stats,
                     )?;
 

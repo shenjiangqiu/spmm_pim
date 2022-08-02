@@ -445,9 +445,11 @@ impl BankTaskReorder {
 mod test {
     use std::{cell::RefCell, path::Path, rc::Rc};
 
+    use itertools::Itertools;
     use qsim::{resources::Store, EndCondition, Simulation};
 
     use crate::{
+        csv_nodata::CsVecNodata,
         settings::RealRowMapping,
         sim::{
             final_receiver::FinalReceiver,
@@ -493,6 +495,11 @@ mod test {
             .shared_status
             .queue_tracker
             .add_component_with_name("123");
+        let all_send_task = two_mat
+            .a
+            .outer_iterator()
+            .map(|x| CsVecNodata::from(x.to_owned()))
+            .collect_vec();
         let task_sender = TaskSender::<DefaultTaskScheduler>::new(
             two_mat.a,
             two_mat.b,
@@ -502,6 +509,7 @@ mod test {
             1,
             RealRowMapping::Chunk,
             queue_id_send,
+            DefaultTaskScheduler::new(all_send_task),
         );
 
         let task_pe = {
