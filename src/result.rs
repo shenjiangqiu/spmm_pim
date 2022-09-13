@@ -16,7 +16,7 @@ pub struct SingleResult<'a> {
     pub new_nnz: usize,
     pub new_element: usize,
     pub need_speed_up: f32,
-    pub row_read: Vec<usize>,
+    pub row_read: Vec<(usize, usize)>,
     pub bank_merge: Vec<usize>,
     pub bank_add: Vec<usize>,
     pub chip_merge: Vec<usize>,

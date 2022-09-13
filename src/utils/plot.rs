@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
     use eyre::Result;
-    use log::error;
     use plotters::prelude::*;
     use rand::SeedableRng;
     use rand_distr::{Distribution, Normal};
     use rand_xorshift::XorShiftRng;
+    use tracing::error;
+
+    use crate::init_logger;
     #[test]
     fn test_plot() -> Result<()> {
         let root = BitMapBackend::new("1.png", (640, 480)).into_drawing_area();
@@ -40,11 +42,7 @@ mod tests {
 
     #[test]
     fn fmt_test() {
-        let config_str = include_str!("../../log_config.yml");
-        let config = serde_yaml::from_str(config_str).unwrap();
-        log4rs::init_raw_config(config).unwrap_or_else(|err| {
-            error!("log4rs init error: {}", err);
-        });
+        init_logger();
         let a = 10;
         let b = 20;
         let c = a + b;

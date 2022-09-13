@@ -2,15 +2,6 @@ use std::fs;
 use std::fs::File;
 use std::io::{self};
 
-use clap::{Command, IntoApp};
-use clap_complete::Generator;
-use eyre::{Context, Result};
-use itertools::Itertools;
-use log::{debug, error, info, warn};
-
-use crate::sim::sim_time::AllTimeStats;
-use crate::sim::Simulator;
-
 use super::{
     args::{Args, RunMode},
     result::{self, Results},
@@ -19,19 +10,21 @@ use super::{
     two_matrix::TwoMatrix,
     utils::run::run_exp_csr,
 };
+use crate::init_logger;
+use crate::sim::sim_time::AllTimeStats;
+use crate::sim::Simulator;
+use clap::{Command, IntoApp};
+use clap_complete::Generator;
+use eyre::{Context, Result};
+use itertools::Itertools;
 use sprs::CsMat;
+use tracing::{debug, error, info};
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
     clap_complete::generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 pub fn main(args: Args) -> Result<()> {
-    // let config_str = include_str!("../log_config_debug.yml");
-    let config_str = include_str!("../log_config.yml");
-    let config = serde_yaml::from_str(config_str).unwrap();
-    log4rs::init_raw_config(config).unwrap_or_else(|err| {
-        warn!("log4rs init error: {}", err);
-    });
-
+    init_logger();
     let start_time = std::time::Instant::now();
     if let Some(generator) = args.generator {
         let mut cmd = Args::command();

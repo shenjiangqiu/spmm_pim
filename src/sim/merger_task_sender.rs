@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use crate::sim::types::{BankTaskEnum, PushBankTaskType, StateWithSharedStatus};
 use genawaiter::rc::{Co, Gen};
 
-use log::debug;
 use qsim::{ResourceId, SimContext};
+use tracing::debug;
 
 use super::{
     buffer_status::BufferStatusId,
@@ -81,11 +81,11 @@ where
                     .queue_tracker
                     .deq(self.get_queue_tracker_id_recv());
                 if gap > 10. {
-                    log::debug!(target : "spmm_pim::sim::merger_task_sender::timeerror",
+                    tracing::debug!(target : "spmm_pim::sim::merger_task_sender::timeerror",
                     "error! gap is too large: {}", gap);
 
                     // print current queue length!
-                    log::debug!(
+                    tracing::debug!(
                         target : "spmm_pim::sim::merger_task_sender::timeerror",
                         "{}",
                         shared_status.queue_tracker.show_data()
@@ -142,7 +142,7 @@ where
                         let gap = _time - current_time;
                         current_time = _time;
                         if gap > 10. {
-                            log::debug!("error! gap is too large: {}", gap);
+                            tracing::debug!("error! gap is too large: {}", gap);
                             // print current queue length!
                         }
                         shared_status.shared_named_time.add_idle_time(

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use log::debug;
+use tracing::debug;
 
 use crate::{
     csv_nodata::CsVecNodata,

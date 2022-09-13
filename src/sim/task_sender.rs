@@ -8,7 +8,7 @@ use crate::{
 };
 use genawaiter::rc::{Co, Gen};
 use itertools::Itertools;
-use log::{debug, info};
+use tracing::{debug, info};
 
 use qsim::ResourceId;
 use sprs::CsMat;

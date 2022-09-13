@@ -1,5 +1,5 @@
-use log::debug;
 use sprs::SpIndex;
+use tracing::debug;
 
 pub struct BsrRowbuilder<N, I, const C: usize, const R: usize> {
     data: Vec<[[N; C]; R]>,

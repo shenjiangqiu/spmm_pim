@@ -1,16 +1,45 @@
 //! the pim module
+//! this module define the trait Pim.
 
-use std::{collections::BTreeMap, fmt::Debug, ops::Deref};
+use std::{
+    collections::BTreeMap,
+    fmt::Debug,
+    iter::Sum,
+    ops::{Deref, Mul},
+};
 
 use itertools::Itertools;
-use log::debug;
+use serde::{Deserialize, Serialize};
 use sprs::SpIndex;
+use tracing::debug;
 
 use crate::{
     csv_nodata::CsVecNodata,
     settings::{MemSettings, RealRowMapping},
     sim::id_translation::BankID,
 };
+
+fn transpose<const R: usize, const C: usize, T>(m: [[T; C]; R]) -> [[T; R]; C] {
+    let mut iters = m.map(|r| r.into_iter());
+
+    use std::array;
+
+    // safety, iters have R elements, so get_unchecked_mut is safe because inner loop have r element
+    // next will be safe because each iter will have C elements
+    array::from_fn(|_| {
+        array::from_fn(|i| unsafe { iters.get_unchecked_mut(i).next().unwrap_unchecked() })
+    })
+}
+#[cfg(test)]
+#[test]
+fn test_transpose() {
+    let m = [[1, 2, 3], [4, 5, 6]];
+    let m_t = transpose(m);
+    assert_eq!(m_t, [[1, 4,], [2, 5,], [3, 6,]]);
+}
+fn mul_vec<const R: usize, T: Mul<Output = T> + Sum>(a: [T; R], b: [T; R]) -> T {
+    a.into_iter().zip(b).map(|(a, b)| a * b).sum()
+}
 /// Partial sum
 /// for each element in `data`
 /// it contains the `(target_index, target_row_size)`
@@ -18,6 +47,71 @@ use crate::{
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PartialSumSize {
     pub data: Vec<(usize, usize)>,
+}
+
+/// the data types that can be operated in Matrix Multiplication like Mat<i32> * Mat<i32> = Mat<i32>
+pub trait MultiplicatableTo<Other> {
+    type Output;
+    fn multiple(&self, other: &Other) -> Self::Output;
+}
+
+impl MultiplicatableTo<f64> for f64 {
+    type Output = f64;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<f32> for f32 {
+    type Output = f32;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<i32> for i32 {
+    type Output = i32;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<i64> for i64 {
+    type Output = i64;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<u32> for u32 {
+    type Output = u32;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<u64> for u64 {
+    type Output = u64;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<usize> for usize {
+    type Output = usize;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl MultiplicatableTo<isize> for isize {
+    type Output = isize;
+    fn multiple(&self, other: &Self) -> Self {
+        self * other
+    }
+}
+impl<T: Mul<Output = T> + Sum + Copy, const R: usize, const C: usize, const C2: usize>
+    MultiplicatableTo<[[T; C2]; C]> for [[T; C]; R]
+{
+    type Output = [[T; C2]; R];
+    fn multiple(&self, other: &[[T; C2]; C]) -> Self::Output {
+        let t_b = transpose(*other);
+
+        self.map(|x| t_b.map(|y| mul_vec(x, y)))
+    }
 }
 
 impl From<Vec<(usize, usize)>> for PartialSumSize {
@@ -94,7 +188,7 @@ where
         self.data.push(item);
     }
 }
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MergeCycle {
     pub add_cycle: usize,
     pub merge_cycle: usize,
@@ -108,24 +202,64 @@ impl From<(usize, usize)> for MergeCycle {
     }
 }
 
+/// the pim trait
+/// for a matrix, or two matrix to implement this trait, it can get the number of cycles to perform matrix multiplication in this matrix.
 pub trait Pim {
-    fn mem_rows(&self, mem_settings: &MemSettings) -> Vec<usize>;
+    /// the cycles to read memory rows. and the data read from memory
+    fn mem_rows(&self, mem_settings: &MemSettings) -> Vec<(usize, usize)>;
+    /// the cycles to perform merge in bank level.
+    /// output: (merge cycle for each bank  , partial sum for each bank)
     fn bank_merge(&self, mem_settings: &MemSettings) -> (Vec<MergeCycle>, Vec<PartialSum<usize>>);
+    /// the cycles to fetch partial sum from bank
+    /// - input bank_merge_result will have the partial sum for each bank
+    /// - output: will have cycles for (each bank sent,each chip received)
+    fn chip_fetch_data(
+        &self,
+        mem_settings: &MemSettings,
+        bank_merge_result: &[PartialSum<usize>],
+    ) -> (Vec<usize>, Vec<usize>);
+
+    /// the cycles to perform merge in chip level.
+    /// output: (merge cycle for each chip  , partial sum for each chip)
     fn chip_merge(
         &self,
         mem_settings: &MemSettings,
         bank_merge_result: &[PartialSum<usize>],
     ) -> (Vec<MergeCycle>, Vec<PartialSum<usize>>);
+    /// the cycles to fetch partial sum from chip
+    /// - input chip_merge_result will have the partial sum for each chip
+    /// - output: will have cycles for each channel
+    fn channel_fetch_data(
+        &self,
+        mem_settings: &MemSettings,
+        chip_merge_result: &[PartialSum<usize>],
+    ) -> (Vec<usize>, Vec<usize>);
+    /// the cycles to perform merge in channel level.
+    /// output: (merge cycle for each channel  , partial sum for each channel)
     fn channel_merge(
         &self,
         mem_settings: &MemSettings,
         chip_merge_result: &[PartialSum<usize>],
     ) -> (Vec<MergeCycle>, Vec<PartialSum<usize>>);
+    /// the cycles to perform merge in dimm level.
+    /// output: (merge cycle for each dimm  , partial sum for each dimm)
     fn dimm_merge(
         &self,
         mem_settings: &MemSettings,
         channel_merge_result: &[PartialSum<usize>],
     ) -> (MergeCycle, PartialSum<usize>);
+
+    /// the cycles to fetch partial sum from channel
+    /// - input channel_merge_result will have the partial sum for each channel
+    /// - output: will have cycles for each dimm
+    fn dimm_fetch_data(
+        &self,
+        mem_settings: &MemSettings,
+        channel_merge_result: &[PartialSum<usize>],
+    ) -> (Vec<usize>, usize);
+
+    /// the cycles to write back to memory
+    fn write_result(&self, mem_settings: &MemSettings, partial_sum: &PartialSum<usize>) -> usize;
 }
 pub fn get_bank_id_from_flat_bank_id(
     flat_bank_id: usize,
@@ -214,7 +348,9 @@ where
     tasks: Vec<(usize, Vec<CsVecNodata<I>>)>,
     current_working_target: usize,
 }
-
+/// - merget a list of tasks into one patrial sum
+/// - merger_size: the number of merger heads
+/// - output: (merger_cycle, add_cycle, partial_sum)
 pub fn merge_rows_into_one(
     tasks: Vec<CsVecNodata<usize>>,
     merger_size: usize,
@@ -538,7 +674,7 @@ pub fn internal_merge(
 //     use sprs::{CsMat, TriMat};
 
 //     use crate::{pim::Pim, settings::MemSettings};
-//     use log::debug;
+//     use tracing::debug;
 
 //     fn read_mtx() -> CsMat<i32> {
 
@@ -880,3 +1016,18 @@ pub fn internal_merge(
 //         }
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_slice_iter() {
+        let a = [[1, 2], [2, 3], [3, 4]];
+        let b = [[1, 2], [2, 3]];
+        let c = a.map(|x| {
+            let t_b = transpose(b);
+            t_b.map(|y| mul_vec(x, y))
+        });
+        println!("{:?}", c);
+    }
+}

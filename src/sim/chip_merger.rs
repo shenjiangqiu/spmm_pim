@@ -101,7 +101,7 @@ mod tests {
     //     EndCondition, Simulation,
     // };
     // use itertools::Itertools;
-    // use log::debug;
+    // use tracing::debug;
 
     // use crate::{
     //     settings::RowMapping,

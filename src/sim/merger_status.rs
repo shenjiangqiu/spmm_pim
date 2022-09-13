@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::VecDeque};
 
 use itertools::Itertools;
-use log::debug;
+use tracing::debug;
 
 /// the merger status,
 /// each merger status represent a set of mergers for a certain Chip.. or channel.

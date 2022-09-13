@@ -11,7 +11,7 @@ use super::{
     LevelId, SpmmStatus, SpmmStatusEnum,
 };
 use genawaiter::rc::{Co, Gen};
-use log::debug;
+use tracing::debug;
 #[derive(Debug)]
 pub struct FullResultMergerWorker {
     pub buffer_status_id: BufferStatusId,

@@ -2,8 +2,8 @@
 
 use std::fmt::Debug;
 
-use log::info;
 use qsim::{resources::Store, Simulation};
+use tracing::info;
 
 use super::{component::Component, SpmmStatus};
 

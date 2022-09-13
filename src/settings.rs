@@ -9,6 +9,7 @@ use eyre::Result;
 use itertools::Itertools;
 use serde::Deserialize;
 
+/// the toml file do not support enum with value
 pub enum RealRowMapping {
     Chunk,
     Interleaved(usize),
@@ -47,7 +48,7 @@ pub enum TaskSchedulerMode {
     ChunkShuffle,
 }
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct MemSettings {
     pub buffer_mode: BufferMode,
 
@@ -96,6 +97,39 @@ pub struct MemSettings {
     pub chip_buffer_lines: usize,
     pub task_scheduler_mode: TaskSchedulerMode,
     pub task_scheduler_chunk_size: usize,
+}
+
+impl Default for MemSettings {
+    fn default() -> Self {
+        Self {
+            buffer_mode: Default::default(),
+            row_size: 4,
+            banks: 2,
+            chips: 2,
+            channels: 2,
+            row_mapping: RowMapping::Interleaved,
+            interleaved_chunk: 1,
+            bank_merger_size: 4,
+            chip_merger_size: 4,
+            channel_merger_size: 4,
+            dimm_merger_size: 4,
+            bank_merger_count: 2,
+            chip_merger_count: 2,
+            channel_merger_count: 2,
+            dimm_merger_count: 2,
+            simd_width: 2,
+            parallel_count: Default::default(),
+            reorder_count: Default::default(),
+            row_change_latency: 2,
+            bank_adder_size: 2,
+            sender_store_size: 2,
+            dimm_buffer_lines: 2,
+            channel_buffer_lines: 2,
+            chip_buffer_lines: 2,
+            task_scheduler_mode: Default::default(),
+            task_scheduler_chunk_size: Default::default(),
+        }
+    }
 }
 #[derive(Deserialize, Debug)]
 pub struct Settings {

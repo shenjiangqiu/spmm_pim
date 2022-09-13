@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use genawaiter::rc::{Co, Gen};
-use log::debug;
 use qsim::ResourceId;
+use tracing::debug;
 
 use crate::{csv_nodata::CsVecNodata, sim::types::StateWithSharedStatus, two_matrix::TwoMatrix};
 

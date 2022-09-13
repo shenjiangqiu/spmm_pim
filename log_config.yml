@@ -29,7 +29,7 @@ root:
     level: info
     appenders:
         - rolling_file
-        - stdout
+        # - stdout
         - file
 loggers:
   spmm_pim::sim:

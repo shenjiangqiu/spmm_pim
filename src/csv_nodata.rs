@@ -102,6 +102,15 @@ where
     }
 }
 
+impl<T> CsVecNodata<T>
+where
+    T: SpIndex,
+{
+    pub fn nnz(&self) -> usize {
+        self.indices.len()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use sprs::CsVec;

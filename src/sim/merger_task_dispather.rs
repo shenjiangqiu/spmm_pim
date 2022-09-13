@@ -10,8 +10,8 @@ use super::{
     SpmmStatusEnum,
 };
 use genawaiter::rc::{Co, Gen};
-use log::debug;
 use qsim::ResourceId;
+use tracing::debug;
 #[derive(Debug)]
 pub struct MergerWorkerDispatcher {
     pub level_id: LevelId,

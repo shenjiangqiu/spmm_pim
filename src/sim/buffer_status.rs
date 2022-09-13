@@ -7,7 +7,7 @@ use std::{
 };
 
 use itertools::Itertools;
-use log::debug;
+use tracing::debug;
 
 /// the buffer status help to decide whether to receive a new line,
 /// # Policy:

@@ -1,8 +1,8 @@
-#![deny(unsafe_code)]
 pub mod args;
 pub mod bsr;
 pub mod bsr_row_builder;
 pub mod csv_nodata;
+pub mod non_pim;
 pub mod pim;
 pub mod reorder_calculator;
 pub mod reorder_system;
@@ -13,6 +13,7 @@ pub mod sim;
 pub mod two_matrix;
 pub mod utils;
 use std::{io::BufReader, path::Path};
+use tracing::metadata::LevelFilter;
 use utils::run;
 
 use result::{Results, SingleResult};
@@ -24,6 +25,20 @@ use crate::{
     run::run_exp_csr,
     settings::{BufferMode, MemSettings, RowMapping},
 };
+
+pub(crate) fn init_logger() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .try_init()
+        .unwrap_or_else(|e| {
+            eprintln!("failed to init logger: {}", e);
+        });
+}
+
 #[derive(Serialize)]
 struct CombinedResult<'a> {
     results: Vec<SingleResult<'a>>,
@@ -96,8 +111,8 @@ pub async fn run1(name: String) -> Result<String, JsValue> {
 #[cfg(test)]
 mod test {
     use eyre::Result;
-    use log::debug;
     use sprs::{CsMat, TriMat};
+    use tracing::debug;
     use wasm_bindgen_test::wasm_bindgen_test;
 
     #[test]

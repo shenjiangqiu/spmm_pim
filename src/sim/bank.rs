@@ -3,8 +3,8 @@ use std::{
     collections::{BTreeMap, VecDeque},
 };
 const BANK_ROW_SIZE: usize = 2048;
-use log::debug;
 use qsim::ResourceId;
+use tracing::debug;
 
 use super::{
     component::Component,
@@ -450,6 +450,7 @@ mod test {
 
     use crate::{
         csv_nodata::CsVecNodata,
+        init_logger,
         settings::RealRowMapping,
         sim::{
             final_receiver::FinalReceiver,
@@ -463,9 +464,7 @@ mod test {
     use super::*;
     #[test]
     fn test_bank() {
-        let config_str = include_str!("../../log_config.yml");
-        let config = serde_yaml::from_str(config_str).unwrap();
-        log4rs::init_raw_config(config).unwrap_or(());
+        init_logger();
         let shared_named_time: Rc<SharedNamedTime> = Rc::new(Default::default());
         let shared_end_time: Rc<SharedEndTime> = Rc::new(Default::default());
         let status = SpmmStatus::new(

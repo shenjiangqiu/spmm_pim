@@ -26,7 +26,7 @@ pub mod types;
 
 use id_translation::*;
 use itertools::Itertools;
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 
 use qsim::{prelude::*, resources::Store};
 
@@ -849,17 +849,16 @@ mod test {
 
     use sprs::CsMat;
 
-    use crate::settings::{BufferMode, RowMapping, TaskSchedulerMode};
+    use crate::{
+        init_logger,
+        settings::{BufferMode, RowMapping, TaskSchedulerMode},
+    };
 
     use super::*;
 
     #[test]
     fn sim_test() {
-        // ---- first create neccessary status structures
-        let config_str = include_str!("../../log_config.yml");
-        let config = serde_yaml::from_str(config_str).unwrap();
-        log4rs::init_raw_config(config).unwrap_or(());
-
+        init_logger();
         debug!("start");
         let csr: CsMat<i32> = sprs::io::read_matrix_market("mtx/bfwa62.mtx")
             .unwrap()

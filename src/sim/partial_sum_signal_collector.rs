@@ -14,7 +14,7 @@ use super::{
     LevelId, SpmmStatus, SpmmStatusEnum,
 };
 use genawaiter::rc::{Co, Gen};
-use log::debug;
+use tracing::debug;
 /// # the signal collector and decide which row to be fetched
 #[derive(Debug)]
 pub struct PartialSumSignalCollector {

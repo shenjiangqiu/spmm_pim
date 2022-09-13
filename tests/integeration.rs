@@ -1,5 +1,5 @@
 use eyre::Result;
-use log::debug;
+use tracing::debug;
 
 use spmm_pim::{
     result::{self, Results},
@@ -12,10 +12,6 @@ use std::path::{Path, PathBuf};
 
 #[test]
 fn test() -> Result<()> {
-    let config_str = include_str!("../log_config.yml");
-    let config = serde_yaml::from_str(config_str).unwrap();
-    log4rs::init_raw_config(config).unwrap();
-
     let config_files: Vec<PathBuf> = vec!["configs/debug.toml".into(), "configs/ddr4.toml".into()];
     let settings = Settings::new(&config_files)?;
     debug!("{:?}", settings);

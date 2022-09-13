@@ -6,8 +6,8 @@ use crate::{
 
 use eyre::Result;
 use itertools::Itertools;
-use log::debug;
 use sprs::CsMat;
+use tracing::{debug, Level};
 
 /// run the matrix csr x csr_transpose
 pub fn run_exp_csr<'a, const R: usize, const C: usize>(
@@ -15,6 +15,8 @@ pub fn run_exp_csr<'a, const R: usize, const C: usize>(
     csr: &CsMat<i32>,
     mem_settings: &MemSettings,
 ) -> Result<SingleResult<'a>> {
+    let span = tracing::span!(Level::INFO,"run_exp_csr", path = ?path);
+    let _entered = span.enter();
     debug!("original_csr nnz: {}", csr.nnz());
     let oldnnz = csr.nnz();
     let csr_transpose = csr.transpose_view().to_csr();
@@ -78,6 +80,7 @@ pub fn run_exp_csr<'a, const R: usize, const C: usize>(
         dimm_merge,
     };
     debug!("{:?}", single_result);
+    tracing::info!(?path, "run_exp_csr done");
     Ok(single_result)
 }
 
@@ -322,7 +325,7 @@ macro_rules! run_2d_unroll_buf {
 mod test {
     // use std::path::PathBuf;
 
-    // use log::debug;
+    // use tracing::debug;
 
     // use crate::result::Results;
     // use crate::settings::MemSettings;

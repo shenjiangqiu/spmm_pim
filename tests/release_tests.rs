@@ -38,6 +38,40 @@ fn test() -> Result<()> {
 
     Ok(())
 }
+#[test]
+#[ignore]
+fn test_unlimited() -> Result<()> {
+    let store_sizes = ["unlimited"];
+    let interleave_chunk_sizes = [1, 2, 4, 8, 16];
+    let scheduler_mode = ["sequence", "shuffle"];
+    let store_and_interleave = store_sizes
+        .into_iter()
+        .cartesian_product(interleave_chunk_sizes)
+        .cartesian_product(scheduler_mode);
+
+    store_and_interleave
+        .par_bridge()
+        .for_each(|((store, inter), scheduler_mode)| {
+            let store_config = format!("configs/store_sizes/{store}.toml");
+            let inter_config = format!("configs/interleaving/{inter}.toml");
+            let scheduler_config = format!("configs/scheduler_modes/{scheduler_mode}.toml");
+            let args = vec![
+                "spmm_pim",
+                "-r",
+                "sim",
+                "configs/large.toml",
+                "configs/ddr4.toml",
+                &scheduler_config,
+                &store_config,
+                &inter_config,
+            ];
+            let args = Args::parse_from(args);
+            println!("hello world!");
+            run_main::main(args).unwrap();
+        });
+
+    Ok(())
+}
 
 #[test]
 #[ignore]
@@ -113,7 +147,7 @@ fn test_batch() -> Result<()> {
 #[ignore]
 fn collect_data() {
     let mut results = vec![];
-    let store_sizes = [32, 64, 128, 256, 512];
+    let store_sizes = ["unlimited"];
     // let interleave_chunk_sizes = [1, 2, 4, 8, 16];
     let scheduler_mode = ["Shuffle", "Sequence"];
 

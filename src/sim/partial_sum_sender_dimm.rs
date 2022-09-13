@@ -3,7 +3,7 @@
 //!
 //!
 
-use log::debug;
+use tracing::debug;
 
 use crate::sim::{
     types::{PushPartialSumType, StateWithSharedStatus},

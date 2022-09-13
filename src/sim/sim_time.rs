@@ -10,8 +10,8 @@
 use std::{cell::RefCell, collections::BTreeMap};
 
 use itertools::Itertools;
-use log::info;
 use serde::Serialize;
+use tracing::info;
 
 /// the time statistics of all components
 ///

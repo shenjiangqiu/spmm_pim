@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use log::debug;
 use sprs::{CsMat, CsMatBase, IndPtr, IndPtrBase, SpIndex};
 use std::ops::Deref;
+use tracing::debug;
 
 use crate::bsr_row_builder::BsrRowbuilder;
 #[derive(Debug, PartialEq, Eq)]
